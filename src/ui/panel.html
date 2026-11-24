@@ -1,0 +1,1315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ferrum Sidebar</title>
+<style>
+  :root {
+    --bg: #08080a;
+    --rail: #050507;
+    --group: #111114;
+    --group-hover: #18181d;
+    --input: #141418;
+    --hairline: rgba(255, 255, 255, 0.075);
+    --hairline-mid: rgba(255, 255, 255, 0.14);
+    --text: rgba(255, 255, 255, 0.92);
+    --sec: rgba(255, 255, 255, 0.52);
+    --dim: rgba(255, 255, 255, 0.28);
+    --green: #30d158;
+    --amber: #ff9f0a;
+    --red: #ff453a;
+    --blue: #64d2ff;
+    --purple: #bf5af2;
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    font-size: 12.5px; letter-spacing: -0.012em;
+    border-left: 1px solid var(--hairline);
+    overflow: hidden; -webkit-font-smoothing: antialiased;
+  }
+
+  .shell { display: flex; flex-direction: column; height: 100%; position: relative; }
+
+  .resize-edge {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 5px;
+    cursor: ew-resize; z-index: 50; background: transparent;
+    transition: background 140ms;
+  }
+  .resize-edge:hover, .resize-edge.dragging { background: rgba(255, 255, 255, 0.22); }
+
+  .rail {
+    height: 42px; flex-shrink: 0; padding: 0 6px 0 8px; background: var(--rail);
+    border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center; justify-content: space-between; gap: 4px;
+  }
+  .rail-icons {
+    display: flex; align-items: center; gap: 1px;
+    flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none;
+  }
+  .rail-icons::-webkit-scrollbar { display: none; }
+  .rail-sep { width: 1px; height: 16px; background: var(--hairline); flex-shrink: 0; }
+  .rbtn {
+    position: relative;
+    width: 27px; height: 27px; flex-shrink: 0; border: none; border-radius: 7px;
+    background: transparent; color: var(--sec); display: grid; place-items: center;
+    cursor: pointer; padding: 0; transition: background 140ms var(--ease), color 140ms var(--ease);
+  }
+  .rbtn.has-update::after {
+    content: ""; position: absolute; top: 4px; right: 4px;
+    width: 6px; height: 6px; border-radius: 50%; background: var(--green);
+  }
+  .rbtn:hover { background: rgba(255, 255, 255, 0.075); color: var(--text); }
+  .rbtn.active { background: #1c1c22; color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,0.08); }
+
+  .body {
+    flex: 1;
+    min-height: 0;
+    container-type: inline-size;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 14px 14px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  /* CRITICAL: Prevent flexbox from shrinking tall cards/sections into each other inside scrollable .body! */
+  .body > * { flex-shrink: 0; }
+  .body::-webkit-scrollbar { width: 4px; }
+  .body::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 99px; }
+
+  .page-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 2px; }
+  .page-title { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: -0.025em; }
+  .head-link {
+    border: none; background: transparent; color: var(--sec);
+    font-family: inherit; font-size: 11.5px; font-weight: 500;
+    cursor: pointer; padding: 3px 6px; border-radius: 6px;
+  }
+  .head-link:hover { background: rgba(255, 255, 255, 0.07); color: #fff; }
+  .head-link.danger { color: #ff6961; }
+
+  .group {
+    background: var(--group); border-radius: 12px; overflow: hidden;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+    min-width: 0;
+  }
+  .group > * { flex-shrink: 0; }
+  .group-pad { padding: 12px 13px; }
+
+  .g-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; padding: 9.5px 13px; position: relative; transition: background 120ms ease;
+    min-width: 0;
+  }
+  .g-row + .g-row::before {
+    content: ""; position: absolute; left: 13px; right: 0; top: 0;
+    height: 1px; background: rgba(255, 255, 255, 0.055);
+  }
+  .g-row.clickable { cursor: pointer; }
+  .g-row.clickable:hover { background: var(--group-hover); }
+  .g-row.selected { background: rgba(255, 255, 255, 0.065); }
+
+  .row-main { flex: 1; min-width: 0; }
+  .row-title { font-size: 12.5px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-sub { font-size: 11px; color: var(--sec); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+  .row-sub.wrap { white-space: normal; overflow: visible; line-height: 1.42; }
+
+  .sec-lbl {
+    font-size: 11px; font-weight: 600; color: var(--dim);
+    padding: 0 4px; margin-top: 6px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+
+  .metrics {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    background: var(--group); border-radius: 12px; padding: 12px 6px; text-align: center;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+  }
+  .metric + .metric { border-left: 1px solid rgba(255, 255, 255, 0.06); }
+  .m-val { font-size: 15.5px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .m-val.green { color: var(--green); }
+  .m-lbl { font-size: 10px; color: var(--sec); margin-top: 2px; }
+
+  .switch {
+    position: relative; width: 36px; height: 20px; border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16); border: none; cursor: pointer; flex-shrink: 0;
+    transition: background 180ms var(--ease);
+  }
+  .switch::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.45);
+    transition: transform 180ms var(--ease);
+  }
+  .switch.on { background: var(--green); }
+  .switch.on::after { transform: translateX(16px); }
+
+  input[type="text"], input[type="password"], textarea, select {
+    width: 100%; background: var(--input); border: 1px solid var(--hairline);
+    border-radius: 9px; color: var(--text); padding: 7.5px 10px;
+    font-family: inherit; font-size: 12.5px; outline: none; transition: border-color 140ms;
+  }
+  input:focus, textarea:focus, select:focus { border-color: rgba(255, 255, 255, 0.28); }
+  input::placeholder, textarea::placeholder { color: var(--dim); }
+  textarea { resize: vertical; min-height: 66px; }
+  select { width: auto; min-width: 98px; padding: 4px 8px; font-size: 11.5px; background: #1a1a20; }
+
+  .hstack { display: flex; gap: 6px; align-items: center; min-width: 0; }
+  .hstack > input[type="text"], .hstack > input[type="password"] { flex: 1; min-width: 0; width: auto; }
+  .hstack.wrap { flex-wrap: wrap; }
+  .vstack { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+  .btn {
+    height: 30px; padding: 0 10px; border-radius: 9px; border: none;
+    background: rgba(255, 255, 255, 0.09); color: var(--text);
+    font-family: inherit; font-size: 12px; font-weight: 550;
+    cursor: pointer; flex-shrink: 0; min-width: 0;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    transition: background 140ms;
+  }
+  .btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.15); }
+  .btn:disabled { opacity: 0.45; cursor: default; }
+  .btn.primary { background: #e5e5ea; color: #000; }
+  .btn.primary:hover:not(:disabled) { background: #fff; }
+  .btn.danger { background: rgba(255, 69, 58, 0.16); color: #ff6961; }
+  .btn.danger:hover { background: rgba(255, 69, 58, 0.26); }
+  .btn.sm { height: 24px; padding: 0 8px; font-size: 11px; border-radius: 7px; }
+
+  .act {
+    width: 24px; height: 24px; border: none; border-radius: 6px;
+    background: transparent; color: var(--sec); display: grid; place-items: center;
+    cursor: pointer; padding: 0; flex-shrink: 0; transition: background 120ms, color 120ms;
+  }
+  .act:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+  .act.del:hover { background: rgba(255, 69, 58, 0.18); color: #ff6961; }
+
+  .tag { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px; flex-shrink: 0; }
+  .tag.Ad { background: rgba(255, 69, 58, 0.16); color: #ff8a80; }
+  .tag.EasyList { background: rgba(255, 105, 97, 0.18); color: #ff9a94; }
+  .tag.Tracker { background: rgba(255, 159, 10, 0.16); color: #ffd180; }
+  .tag.Analytics { background: rgba(100, 210, 255, 0.15); color: #90e0ff; }
+  .tag.Social { background: rgba(191, 90, 242, 0.16); color: #e4b5ff; }
+  .tag.Security { background: rgba(255, 45, 85, 0.22); color: #ff6b81; }
+  .tag.Custom { background: rgba(255, 255, 255, 0.12); color: #fff; }
+  .tag.ok { background: rgba(48, 209, 88, 0.15); color: #7ee797; }
+
+  .dl-bar-wrap { width: 100%; height: 3px; border-radius: 99px; background: rgba(255,255,255,0.09); margin-top: 6px; overflow: hidden; }
+  .dl-bar { height: 100%; background: var(--green); border-radius: 99px; transition: width 150ms linear; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px;
+    max-width: 100%; border-radius: 999px; background: rgba(255, 255, 255, 0.08); font-size: 11px;
+  }
+  .chip-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  .chip button { border: none; background: transparent; color: var(--sec); cursor: pointer; padding: 0; font-size: 12px; flex-shrink: 0; }
+  .chip button:hover { color: #ff6961; }
+  .head-link.ellipsis { max-width: 100%; display: inline-block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+
+  .ws-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  kbd {
+    background: rgba(255, 255, 255, 0.07); border-radius: 5px; padding: 2px 6px;
+    font-family: -apple-system, Consolas, monospace; font-size: 10.5px; color: var(--sec); flex-shrink: 0;
+  }
+  .empty { text-align: center; color: var(--dim); padding: 24px 14px; font-size: 12px; line-height: 1.5; }
+  .err-box { padding: 8px 10px; border-radius: 8px; background: rgba(255,69,58,0.14); color: #ff8a80; font-size: 11.5px; }
+  .note-text { font-size: 12px; color: rgba(255,255,255,0.74); white-space: pre-wrap; margin-top: 5px; line-height: 1.5; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .opt-card {
+    padding: 9px 9px; border-radius: 10px; border: 1px solid transparent;
+    background: var(--group); color: var(--sec); cursor: pointer; text-align: left;
+    min-width: 0; overflow: hidden;
+    font-family: inherit; font-size: 11.5px; font-weight: 550; transition: background 120ms, color 120ms, border-color 120ms;
+  }
+  .opt-card > div { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .opt-card:hover { background: var(--group-hover); color: #fff; }
+  .opt-card.selected { background: #1d1d24; border-color: rgba(255, 255, 255, 0.24); color: #fff; }
+  @container (max-width: 280px) {
+    .grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="resize-edge" id="resize-edge" title="Arrastra para ajustar el ancho del panel"></div>
+  <div class="rail">
+    <div class="rail-icons" id="rail-icons">
+      <button class="rbtn" data-tab="commands" title="Comandos (Ctrl+K)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg>
+      </button>
+      <button class="rbtn" data-tab="shield" title="Escudo y EasyList">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/></svg>
+      </button>
+      <button class="rbtn" data-tab="vault" title="Bóveda de contraseñas">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2.5"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </button>
+      <button class="rbtn" data-tab="extensions" title="Extensiones y Userscripts">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      </button>
+      <button class="rbtn" data-tab="workspaces" title="Espacios y Vista Dividida">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+      </button>
+      <button class="rbtn" data-tab="bookmarks" title="Marcadores e Importar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+      </button>
+      <button class="rbtn" data-tab="history" title="Historial (Ctrl+H)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15.5 14"/></svg>
+      </button>
+      <button class="rbtn" data-tab="downloads" title="Descargas (Ctrl+J)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+      <button class="rbtn" data-tab="notes" title="Notas rápidas">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      </button>
+      <button class="rbtn" data-tab="settings" title="Ajustes y Layout">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 0 1 0 4h-.09c-.66 0-1.25.4-1.51 1z"/></svg>
+      </button>
+    </div>
+    <span class="rail-sep"></span>
+    <button class="rbtn" id="btn-close" title="Cerrar panel">
+      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>
+    </button>
+  </div>
+  <div class="body" id="panel-body"></div>
+</div>
+
+<script>
+  const send = (p) => { try { window.ipc.postMessage(JSON.stringify(p)); } catch (_) {} };
+  let state = null;
+  let query = '';
+  let confirmClearHist = false;
+  let confirmClearAll = false;
+  let confirmExecDlId = null;
+  const DANGEROUS_EXT_RE = /\.(exe|msi|bat|cmd|ps1|vbs|vbe|js|jse|wsf|scr|com|pif|hta|lnk|reg|dll)$/i;
+  const bodyEl = document.getElementById('panel-body');
+
+  const IC_X = '<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>';
+  const IC_EXT = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>';
+  const IC_SPLIT = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="12" y1="4" x2="12" y2="20"/></svg>';
+  const IC_FOLDER = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+  const IC_PAUSE = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><line x1="8" y1="5" x2="8" y2="19"/><line x1="16" y1="5" x2="16" y2="19"/></svg>';
+  const IC_PLAY = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="6 4 20 12 6 20 6 4"/></svg>';
+  const IC_COPY = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>';
+  const IC_SLEEP = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+
+  document.querySelectorAll('.rbtn[data-tab]').forEach(btn => {
+    btn.onclick = () => {
+      query = ''; confirmClearHist = false; confirmClearAll = false;
+      send({ cmd: 'toggle_panel', panel: btn.dataset.tab });
+    };
+  });
+  document.getElementById('btn-close').onclick = () => send({ cmd: 'close_panel' });
+
+  const esc = (s) => String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+  const fmtBytes = (b) => !b ? '0 KB' : (b < 1048576 ? Math.max(1, Math.round(b / 1024)) + ' KB' : (b / 1048576).toFixed(1) + ' MB');
+  const fmtNum = (n) => Number(n || 0).toLocaleString('es-ES');
+  const fmtTime = (ts) => {
+    if (!ts) return '';
+    const d = new Date(ts * 1000);
+    const same = d.toDateString() === new Date().toDateString();
+    const hm = d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+    return same ? 'Hoy ' + hm : d.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) + ' · ' + hm;
+  };
+
+  function bindSearch(id) {
+    const inp = document.getElementById(id);
+    if (!inp) return;
+    inp.oninput = (e) => {
+      query = e.target.value;
+      render();
+      const el = document.getElementById(id);
+      if (el) { el.focus(); el.setSelectionRange(query.length, query.length); }
+    };
+  }
+
+  function renderCommands(s) {
+    const q = query.trim().toLowerCase();
+    const actions = [
+      { label: 'Nueva pestaña', kbd: 'Ctrl+T', run: () => send({ cmd: 'new_tab', url: null, private: false }) },
+      { label: 'Nueva ventana independiente', kbd: 'Ctrl+N', run: () => send({ cmd: 'new_window', url: null }) },
+      { label: 'Nueva pestaña privada (Incógnito)', kbd: 'Ctrl+Shift+N', run: () => send({ cmd: 'new_tab', url: null, private: true }) },
+      { label: 'Bloquear elemento visual (Selector Escudo)', kbd: 'Alt+E', run: () => send({ cmd: 'start_element_picker' }) },
+      { label: 'Autocompletar contraseña del sitio', kbd: 'Ctrl+Shift+L', run: () => send({ cmd: 'quick_autofill' }) },
+      { label: 'Buscar actualizaciones de Ferrum (GitHub)', kbd: '', run: () => send({ cmd: 'check_for_updates' }) },
+      { label: 'Abrir sitio actual como Web App (PWA)', kbd: '', run: () => send({ cmd: 'launch_pwa_current' }) },
+      { label: 'Instalar Web App actual en el Escritorio', kbd: '', run: () => send({ cmd: 'install_pwa_shortcut_current' }) },
+      { label: 'Borrar cookies y datos de este sitio', kbd: '', run: () => send({ cmd: 'clear_current_site_cookies' }) },
+      { label: s.split_tab_id ? 'Cerrar Vista Dividida' : 'Activar Vista Dividida (2 pestañas)', kbd: 'Ctrl+\\', run: () => send({ cmd: 'toggle_split_view', target_tab_id: null }) },
+      { label: 'Picture-in-Picture (video flotante)', kbd: 'Alt+P', run: () => send({ cmd: 'toggle_pip' }) },
+      { label: 'Captura de pantalla PNG', kbd: 'Ctrl+Shift+S', run: () => send({ cmd: 'capture_screenshot' }) },
+      { label: 'Copiar enlace limpio (sin rastreo)', kbd: 'Ctrl+Shift+C', run: () => send({ cmd: 'copy_clean_url' }) },
+      { label: 'Traducir página actual al español', kbd: '', run: () => send({ cmd: 'translate_current_page' }) },
+      { label: 'Modo Lectura sin distracciones', kbd: 'Alt+R', run: () => send({ cmd: 'toggle_reader_mode' }) },
+      { label: 'Modo Oscuro OLED inteligente', kbd: 'Alt+D', run: () => send({ cmd: 'toggle_force_dark' }) },
+      { label: 'Buscar texto en página', kbd: 'Ctrl+F', run: () => send({ cmd: 'open_find' }) },
+      { label: 'Cambiar a Layout Compacto (1 fila Safari)', kbd: '', run: () => send({ cmd: 'set_layout_mode', mode: 'compact' }) },
+      { label: 'Cambiar a Layout Vertical (estilo Arc)', kbd: '', run: () => send({ cmd: 'set_layout_mode', mode: 'vertical' }) },
+      { label: 'Cambiar a Layout Minimalista (2 filas)', kbd: '', run: () => send({ cmd: 'set_layout_mode', mode: 'minimal' }) },
+      { label: 'Duplicar pestaña actual', kbd: 'Ctrl+Shift+K', run: () => send({ cmd: 'duplicate_tab', id: s.active_tab_id }) },
+      { label: 'Fijar o desfijar pestaña', kbd: 'Ctrl+Shift+P', run: () => send({ cmd: 'toggle_pin_tab', id: s.active_tab_id }) },
+      { label: 'Silenciar o activar audio', kbd: 'Ctrl+M', run: () => send({ cmd: 'toggle_mute_tab', id: s.active_tab_id }) },
+      { label: 'Imprimir o guardar PDF', kbd: 'Ctrl+P', run: () => send({ cmd: 'print_page' }) },
+      { label: 'Pantalla completa', kbd: 'F11', run: () => send({ cmd: 'toggle_fullscreen' }) },
+      { label: 'DevTools', kbd: 'F12', run: () => send({ cmd: 'open_devtools' }) },
+    ].filter(a => !q || a.label.toLowerCase().includes(q));
+
+    const matchTabs = s.tabs.filter(t => !q || t.title.toLowerCase().includes(q) || t.display_url.toLowerCase().includes(q));
+    const matchBm = s.bookmarks.filter(b => q && (b.title.toLowerCase().includes(q) || b.url.toLowerCase().includes(q))).slice(0, 6);
+    const matchHist = s.history.filter(h => q && (h.title.toLowerCase().includes(q) || h.url.toLowerCase().includes(q))).slice(0, 6);
+
+    bodyEl.innerHTML = `
+      <div class="page-head"><h2 class="page-title">Comandos</h2></div>
+      <input type="text" id="cmd-q" placeholder="Buscar pestañas, marcadores o comandos..." value="${esc(query)}" autofocus />
+
+      ${matchTabs.length ? `
+        <div class="sec-lbl"><span>Pestañas abiertas</span><span>${matchTabs.length}</span></div>
+        <div class="group">
+          ${matchTabs.map(t => `
+            <div class="g-row clickable ${t.id === s.active_tab_id ? 'selected' : ''}" data-sw="${t.id}">
+              <div class="row-main">
+                <div class="row-title">${esc(t.title)}</div>
+                <div class="row-sub">${t.is_private ? 'Privada · ' : ''}${t.is_hibernated ? 'Hibernada · ' : ''}${esc(t.host || t.display_url)}</div>
+              </div>
+              ${t.id !== s.active_tab_id ? `<button class="act" data-sp="${t.id}" title="Abrir en Vista Dividida">${IC_SPLIT}</button>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+
+      <div class="sec-lbl"><span>Acciones</span></div>
+      <div class="group">
+        ${actions.map((a, i) => `
+          <div class="g-row clickable" data-act="${i}">
+            <div class="row-main"><div class="row-title">${esc(a.label)}</div></div>
+            ${a.kbd ? `<kbd>${esc(a.kbd)}</kbd>` : ''}
+          </div>
+        `).join('')}
+      </div>
+
+      ${matchBm.length ? `
+        <div class="sec-lbl"><span>Marcadores</span></div>
+        <div class="group">${matchBm.map(b => `<div class="g-row clickable" data-open="${esc(b.url)}"><div class="row-main"><div class="row-title">${esc(b.title)}</div><div class="row-sub">${esc(b.url)}</div></div></div>`).join('')}</div>
+      ` : ''}
+      ${matchHist.length ? `
+        <div class="sec-lbl"><span>Historial</span></div>
+        <div class="group">${matchHist.map(h => `<div class="g-row clickable" data-open="${esc(h.url)}"><div class="row-main"><div class="row-title">${esc(h.title)}</div><div class="row-sub">${esc(h.url)}</div></div></div>`).join('')}</div>
+      ` : ''}
+    `;
+
+    bindSearch('cmd-q');
+    bodyEl.querySelectorAll('[data-sw]').forEach(el => el.onclick = () => send({ cmd: 'switch_tab', id: Number(el.dataset.sw) }));
+    bodyEl.querySelectorAll('[data-sp]').forEach(b => b.onclick = (e) => { e.stopPropagation(); send({ cmd: 'toggle_split_view', target_tab_id: Number(b.dataset.sp) }); });
+    bodyEl.querySelectorAll('[data-act]').forEach(el => el.onclick = () => actions[Number(el.dataset.act)]?.run());
+    bodyEl.querySelectorAll('[data-open]').forEach(el => el.onclick = () => send({ cmd: 'open_url', url: el.dataset.open, new_tab: false }));
+  }
+
+  function renderShield(s) {
+    const sh = s.shield;
+    const permOpts = (v) => `
+      <option value="deny" ${v === 'deny' ? 'selected' : ''}>Bloquear</option>
+      <option value="ask" ${v === 'ask' ? 'selected' : ''}>Preguntar</option>
+      <option value="allow" ${v === 'allow' ? 'selected' : ''}>Permitir</option>
+    `;
+    bodyEl.innerHTML = `
+      <div class="page-head">
+        <h2 class="page-title">Escudo</h2>
+        <button class="switch ${sh.enabled ? 'on' : ''}" id="sw-global"></button>
+      </div>
+
+      <div class="metrics">
+        <div class="metric"><div class="m-val green">${sh.tab_blocked}</div><div class="m-lbl">Esta pestaña</div></div>
+        <div class="metric"><div class="m-val">${fmtNum(sh.total_blocked)}</div><div class="m-lbl">Total</div></div>
+        <div class="metric"><div class="m-val">${fmtBytes(sh.bytes_saved)}</div><div class="m-lbl">Ahorrado</div></div>
+      </div>
+
+      <div class="group group-pad">
+        <div class="hstack" style="justify-content:space-between;margin-bottom:6px;">
+          <div class="row-main">
+            <div class="row-title">Motor adblock-rust (EasyList + EasyPrivacy)</div>
+            <div class="row-sub">${sh.has_community_lists ? `${fmtNum(sh.rules_count)} reglas activas${sh.lists_updated_at ? ' · ' + fmtTime(sh.lists_updated_at) : ''}` : `${fmtNum(sh.rules_count)} reglas base (descarga +100.000 reglas)`}</div>
+          </div>
+        </div>
+        <button class="btn primary" style="width:100%" id="btn-upd-lists" ${sh.updating_lists ? 'disabled' : ''}>
+          ${sh.updating_lists ? 'Descargando y compilando listas...' : (sh.has_community_lists ? 'Actualizar listas comunitarias' : 'Descargar EasyList + EasyPrivacy + Cookies')}
+        </button>
+      </div>
+
+      <div class="sec-lbl"><span>Sitio actual y selector visual</span></div>
+      <div class="group group-pad vstack">
+        ${sh.current_host ? `
+          <div class="hstack" style="justify-content:space-between;">
+            <div class="row-main">
+              <div class="row-title">${esc(sh.current_host)}</div>
+              <div class="row-sub">${(s.tabs.find(t => t.id === s.active_tab_id)?.display_url || '').startsWith('https://') ? 'Conexión HTTPS cifrada' : 'Conexión sin cifrado HTTPS'}</div>
+            </div>
+            <span class="tag ok">TLS</span>
+          </div>
+          <div class="hstack wrap">
+            <button class="btn primary" style="flex:1" id="btn-picker">Selector de elementos</button>
+            <button class="btn danger" id="btn-clr-cookies">Borrar cookies</button>
+          </div>
+        ` : '<div class="row-sub">Abre un sitio web para inspeccionar su seguridad, cookies o bloquear elementos visuales.</div>'}
+        ${sh.custom_cosmetic_rules?.length ? `
+          <div class="chips">${sh.custom_cosmetic_rules.map(sel => `<span class="chip" title="${esc(sel)}"><span class="chip-txt">${esc(sel)}</span><button data-rm-cos="${esc(sel)}">×</button></span>`).join('')}</div>
+        ` : ''}
+      </div>
+
+      <div class="sec-lbl"><span>Protección</span></div>
+      <div class="group">
+        ${sh.current_host ? `
+          <div class="g-row">
+            <div class="row-main"><div class="row-title">Pausar en ${esc(sh.current_host)}</div><div class="row-sub">Desactiva filtros solo aquí</div></div>
+            <button class="switch ${sh.site_allowlisted ? 'on' : ''}" id="sw-site"></button>
+          </div>
+        ` : ''}
+        <div class="g-row">
+          <div class="row-main"><div class="row-title">HTTPS-Only</div><div class="row-sub">Actualiza conexiones HTTP a HTTPS</div></div>
+          <button class="switch ${sh.https_only ? 'on' : ''}" id="sw-https"></button>
+        </div>
+        <div class="g-row">
+          <div class="row-main"><div class="row-title">Anti-banners de cookies</div><div class="row-sub">Oculta popups GDPR y desbloquea scroll</div></div>
+          <button class="switch ${sh.block_cookie_banners ? 'on' : ''}" id="sw-cookies"></button>
+        </div>
+        <div class="g-row">
+          <div class="row-main"><div class="row-title">Anti-Fingerprinting y GPC</div><div class="row-sub">Global Privacy Control y bloqueo de beacons</div></div>
+          <button class="switch ${sh.anti_fingerprint ? 'on' : ''}" id="sw-afp"></button>
+        </div>
+        <div class="g-row">
+          <div class="row-main"><div class="row-title">Ocultamiento cosmético</div><div class="row-sub">Colapsa espacios vacíos de anuncios</div></div>
+          <button class="switch ${sh.cosmetic_enabled ? 'on' : ''}" id="sw-cosmetic"></button>
+        </div>
+        <div class="g-row">
+          <div class="row-main"><div class="row-title">Limpiar rastreo en URLs</div><div class="row-sub">Elimina utm_*, fbclid y gclid</div></div>
+          <button class="switch ${sh.strip_tracking_params ? 'on' : ''}" id="sw-strip"></button>
+        </div>
+      </div>
+
+      <div class="sec-lbl"><span>Permisos</span></div>
+      <div class="group">
+        <div class="g-row"><div class="row-main"><div class="row-title">Notificaciones</div></div><select data-perm="notifications">${permOpts(sh.permissions.notifications)}</select></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Ubicación</div></div><select data-perm="geolocation">${permOpts(sh.permissions.geolocation)}</select></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Cámara y micrófono</div></div><select data-perm="camera_mic">${permOpts(sh.permissions.camera_mic)}</select></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Sensores</div></div><select data-perm="sensors">${permOpts(sh.permissions.sensors)}</select></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Portapapeles</div></div><select data-perm="clipboard">${permOpts(sh.permissions.clipboard)}</select></div>
+      </div>
+
+      <div class="sec-lbl"><span>Reglas personalizadas</span></div>
+      <div class="group group-pad">
+        <div class="hstack">
+          <input type="text" id="in-block" placeholder="Bloquear dominio (ej. ads.sitio.com)" />
+          <button class="btn primary" id="btn-add-b">Añadir</button>
+        </div>
+        ${sh.custom_blocked_domains.length ? `<div class="chips">${sh.custom_blocked_domains.map(d => `<span class="chip" title="${esc(d)}"><span class="chip-txt">${esc(d)}</span><button data-rm-b="${esc(d)}">×</button></span>`).join('')}</div>` : ''}
+        ${sh.allowlisted_domains.length ? `<div class="chips">${sh.allowlisted_domains.map(d => `<span class="chip" title="${esc(d)}"><span class="chip-txt">Permitido: ${esc(d)}</span><button data-rm-a="${esc(d)}">×</button></span>`).join('')}</div>` : ''}
+      </div>
+
+      <div class="sec-lbl"><span>Bloqueados en esta pestaña</span><span>${sh.recent_blocked.length}</span></div>
+      ${sh.recent_blocked.length ? `
+        <div class="group">
+          ${sh.recent_blocked.slice(0, 30).map(ev => `
+            <div class="g-row">
+              <div class="row-main"><div class="row-title">${esc(ev.domain)}</div><div class="row-sub" title="${esc(ev.url)}">${esc(ev.url)}</div></div>
+              <span class="tag ${esc(ev.category)}">${esc(ev.category_label)}</span>
+            </div>
+          `).join('')}
+        </div>
+      ` : '<div class="empty">Sin rastreadores bloqueados en esta pestaña.</div>'}
+    `;
+
+    document.getElementById('sw-global').onclick = () => send({ cmd: 'toggle_shield_global' });
+    document.getElementById('btn-upd-lists').onclick = () => send({ cmd: 'update_filter_lists' });
+    document.getElementById('btn-picker')?.addEventListener('click', () => send({ cmd: 'start_element_picker' }));
+    document.getElementById('btn-clr-cookies')?.addEventListener('click', () => send({ cmd: 'clear_current_site_cookies' }));
+    bodyEl.querySelectorAll('[data-rm-cos]').forEach(b => b.onclick = () => send({ cmd: 'remove_cosmetic_rule', host: sh.current_host || '', selector: b.dataset.rmCos }));
+    document.getElementById('sw-site')?.addEventListener('click', () => send({ cmd: 'toggle_site_allowlist', host: sh.current_host }));
+    document.getElementById('sw-https').onclick = () => send({ cmd: 'toggle_https_only' });
+    document.getElementById('sw-cookies').onclick = () => send({ cmd: 'toggle_cookie_banners' });
+    document.getElementById('sw-afp').onclick = () => send({ cmd: 'toggle_anti_fingerprint' });
+    document.getElementById('sw-cosmetic').onclick = () => send({ cmd: 'toggle_shield_cosmetic' });
+    document.getElementById('sw-strip').onclick = () => send({ cmd: 'toggle_strip_tracking' });
+    bodyEl.querySelectorAll('[data-perm]').forEach(sel => sel.onchange = () => send({ cmd: 'set_permission', kind: sel.dataset.perm, mode: sel.value }));
+    const addB = () => { const v = document.getElementById('in-block')?.value.trim(); if (v) send({ cmd: 'add_custom_block_domain', domain: v }); };
+    document.getElementById('btn-add-b').onclick = addB;
+    document.getElementById('in-block').onkeydown = (e) => { if (e.key === 'Enter') addB(); };
+    bodyEl.querySelectorAll('[data-rm-b]').forEach(b => b.onclick = () => send({ cmd: 'remove_custom_block_domain', domain: b.dataset.rmB }));
+    bodyEl.querySelectorAll('[data-rm-a]').forEach(b => b.onclick = () => send({ cmd: 'remove_allowlist_domain', domain: b.dataset.rmA }));
+  }
+
+  function renderVault(s) {
+    const v = s.vault;
+    const active = s.tabs.find(t => t.id === s.active_tab_id);
+    if (!v.unlocked) {
+      bodyEl.innerHTML = `
+        <div class="page-head"><h2 class="page-title">Bóveda</h2></div>
+        <div class="group group-pad vstack">
+          <div class="row-title">${v.exists ? 'Bóveda bloqueada' : 'Crear bóveda cifrada local'}</div>
+          <div class="row-sub" style="white-space:normal;line-height:1.45;">
+            Cifrado 100% local con <strong>Argon2id + AES-256-GCM</strong> en tu disco. Ninguna contraseña sale de tu equipo.
+          </div>
+          ${v.error ? `<div class="err-box">${esc(v.error)}</div>` : ''}
+          <input type="password" id="v-master" placeholder="${v.exists ? 'Introduce tu clave maestra...' : 'Nueva clave maestra (mín. 6 caracteres)...'}" autofocus />
+          <button class="btn primary" id="v-submit">${v.exists ? 'Desbloquear bóveda' : 'Crear bóveda segura'}</button>
+        </div>
+      `;
+      const go = () => {
+        const pw = document.getElementById('v-master').value;
+        if (pw) send({ cmd: v.exists ? 'vault_unlock' : 'vault_setup', password: pw });
+      };
+      document.getElementById('v-submit').onclick = go;
+      document.getElementById('v-master').onkeydown = (e) => { if (e.key === 'Enter') go(); };
+      return;
+    }
+
+    const q = query.toLowerCase();
+    const filtered = v.entries.filter(c => !q || c.site.toLowerCase().includes(q) || c.username.toLowerCase().includes(q));
+    bodyEl.innerHTML = `
+      <div class="page-head">
+        <h2 class="page-title">Bóveda</h2>
+        <button class="head-link" id="v-lock">Bloquear</button>
+      </div>
+      <input type="text" id="v-q" placeholder="Buscar credenciales..." value="${esc(query)}" />
+
+      <div class="group group-pad vstack">
+        <div class="row-title">Guardar credencial</div>
+        <input type="text" id="v-site" placeholder="Sitio (ej. github.com)" value="${esc(active?.host || '')}" />
+        <input type="text" id="v-user" placeholder="Usuario o correo" />
+        <div class="hstack">
+          <input type="text" id="v-pass" placeholder="Contraseña" value="${esc(v.generated_password || '')}" />
+          <button class="btn" id="v-gen" title="Generar contraseña aleatoria segura">Generar</button>
+        </div>
+        <button class="btn primary" id="v-add">Guardar en bóveda cifrada</button>
+      </div>
+
+      <div class="group group-pad vstack">
+        <div class="row-title">Importar / Exportar CSV y Auto-bloqueo</div>
+        <div class="hstack wrap">
+          <button class="btn sm" style="flex:1" id="v-imp-btn" title="Importar desde Chrome, Edge, Brave o Bitwarden">Importar CSV</button>
+          <button class="btn sm" style="flex:1" id="v-exp-btn">Exportar CSV</button>
+          <input type="file" id="v-csv-file" accept=".csv,text/csv" style="display:none" />
+        </div>
+        <div class="hstack" style="justify-content:space-between;margin-top:2px;">
+          <span class="row-sub">Bloquear automáticamente tras inactividad</span>
+          <select id="v-autolock">
+            <option value="0" ${v.auto_lock_minutes === 0 ? 'selected' : ''}>Nunca</option>
+            <option value="5" ${v.auto_lock_minutes === 5 ? 'selected' : ''}>5 min</option>
+            <option value="15" ${v.auto_lock_minutes === 15 ? 'selected' : ''}>15 min</option>
+            <option value="30" ${v.auto_lock_minutes === 30 ? 'selected' : ''}>30 min</option>
+          </select>
+        </div>
+      </div>
+
+      ${v.error ? `<div class="err-box">${esc(v.error)}</div>` : ''}
+
+      <div class="sec-lbl"><span>Credenciales guardadas</span><span>${filtered.length}</span></div>
+      ${filtered.length ? `
+        <div class="group">
+          ${filtered.map(c => `
+            <div class="g-row">
+              <div class="row-main">
+                <div class="row-title">${esc(c.site)}</div>
+                <div class="row-sub">${esc(c.username || 'Sin usuario')}</div>
+              </div>
+              <button class="btn sm" data-fill="${esc(c.id)}" title="Autocompletar en la página actual">Llenar</button>
+              <button class="act" data-cp="${esc(c.id)}" title="Copiar contraseña">${IC_COPY}</button>
+              <button class="act del" data-delv="${esc(c.id)}" title="Eliminar">${IC_X}</button>
+            </div>
+          `).join('')}
+        </div>
+      ` : '<div class="empty">Tu bóveda está vacía. Guarda aquí tus accesos cifrados localmente.</div>'}
+    `;
+
+    bindSearch('v-q');
+    document.getElementById('v-lock').onclick = () => send({ cmd: 'vault_lock' });
+    document.getElementById('v-gen').onclick = () => send({ cmd: 'vault_generate_password', length: 20, symbols: true });
+    document.getElementById('v-imp-btn').onclick = () => document.getElementById('v-csv-file').click();
+    document.getElementById('v-csv-file').onchange = (e) => {
+      const f = e.target.files?.[0];
+      if (!f) return;
+      const reader = new FileReader();
+      reader.onload = () => send({ cmd: 'vault_import_csv', csv: String(reader.result || '') });
+      reader.readAsText(f);
+    };
+    document.getElementById('v-exp-btn').onclick = () => send({ cmd: 'vault_export_csv' });
+    document.getElementById('v-autolock').onchange = (e) => send({ cmd: 'set_vault_auto_lock', minutes: Number(e.target.value) });
+    document.getElementById('v-add').onclick = () => {
+      const site = document.getElementById('v-site').value.trim();
+      const username = document.getElementById('v-user').value.trim();
+      const password = document.getElementById('v-pass').value;
+      if (site && password) send({ cmd: 'vault_add', site, username, password, notes: '' });
+    };
+    bodyEl.querySelectorAll('[data-fill]').forEach(b => b.onclick = () => send({ cmd: 'vault_autofill', id: b.dataset.fill }));
+    bodyEl.querySelectorAll('[data-cp]').forEach(b => b.onclick = () => send({ cmd: 'vault_copy_password', id: b.dataset.cp }));
+    bodyEl.querySelectorAll('[data-delv]').forEach(b => b.onclick = () => send({ cmd: 'vault_remove', id: b.dataset.delv }));
+  }
+
+  function renderExtensions(s) {
+    const exts = s.extensions || [];
+    const scripts = s.userscripts || [];
+    bodyEl.innerHTML = `
+      <div class="page-head"><h2 class="page-title">Extensiones</h2></div>
+
+      <div class="sec-lbl"><span>Extensiones Chromium MV3 (descomprimidas)</span><span>${exts.length}</span></div>
+      <div class="group group-pad vstack">
+        <div class="row-sub" style="white-space:normal;line-height:1.4;">
+          Elige o pega la carpeta de cualquier extensión descomprimida con <code>manifest.json</code> (Chrome / Edge MV3).
+        </div>
+        <button class="btn primary" id="ext-browse">Examinar carpeta de extensión...</button>
+        <div class="hstack">
+          <input type="text" id="ext-path" placeholder="O pega ruta manual (C:\\...)" />
+          <button class="btn" id="ext-add">Cargar</button>
+        </div>
+      </div>
+
+      ${exts.length ? `
+        <div class="group">
+          ${exts.map(e => `
+            <div class="g-row">
+              <div class="row-main"><div class="row-title">${esc(e.name)}</div><div class="row-sub">${esc(e.id)}</div></div>
+              <button class="switch ${e.enabled ? 'on' : ''}" data-ext-tog="${esc(e.id)}" data-ext-en="${e.enabled ? '1' : '0'}"></button>
+              <button class="act del" data-ext-rm="${esc(e.id)}" title="Quitar extensión">${IC_X}</button>
+            </div>
+          `).join('')}
+        </div>
+      ` : '<div class="empty" style="padding:12px;">Sin extensiones Chromium cargadas todavía.</div>'}
+
+      <div class="sec-lbl"><span>Userscripts integrados</span><span>${scripts.length}</span></div>
+      <div class="group">
+        ${scripts.map(u => `
+          <div class="g-row">
+            <div class="row-main"><div class="row-title">${esc(u.name)}</div><div class="row-sub">Sitios: ${esc(u.match_pattern)}</div></div>
+            <button class="switch ${u.enabled ? 'on' : ''}" data-us-tog="${esc(u.id)}"></button>
+            <button class="act del" data-us-rm="${esc(u.id)}" title="Eliminar">${IC_X}</button>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="group group-pad vstack">
+        <div class="row-title">Nuevo Userscript</div>
+        <input type="text" id="us-name" placeholder="Nombre (ej. Ocultar shorts)" />
+        <input type="text" id="us-match" placeholder="Dominios (ej. *, youtube.com, *.github.com)" value="*" />
+        <textarea id="us-code" placeholder="// JavaScript a ejecutar al cargar la página..."></textarea>
+        <button class="btn primary" id="us-add">Guardar Userscript</button>
+      </div>
+    `;
+
+    document.getElementById('ext-browse').onclick = () => send({ cmd: 'browse_folder', target: 'extension' });
+    document.getElementById('ext-add').onclick = () => {
+      const p = document.getElementById('ext-path').value.trim();
+      if (p) send({ cmd: 'add_chromium_extension', folder_path: p });
+    };
+    bodyEl.querySelectorAll('[data-ext-tog]').forEach(b => b.onclick = () => {
+      send({ cmd: 'toggle_chromium_extension', id: b.dataset.extTog, enabled: b.dataset.extEn !== '1' });
+    });
+    bodyEl.querySelectorAll('[data-ext-rm]').forEach(b => b.onclick = () => {
+      send({ cmd: 'remove_chromium_extension', id: b.dataset.extRm });
+    });
+    bodyEl.querySelectorAll('[data-us-tog]').forEach(b => b.onclick = () => send({ cmd: 'toggle_user_script', id: b.dataset.usTog }));
+    bodyEl.querySelectorAll('[data-us-rm]').forEach(b => b.onclick = () => send({ cmd: 'remove_user_script', id: b.dataset.usRm }));
+    document.getElementById('us-add').onclick = () => {
+      const name = document.getElementById('us-name').value.trim();
+      const match_pattern = document.getElementById('us-match').value.trim();
+      const code = document.getElementById('us-code').value.trim();
+      if (name && code) send({ cmd: 'add_user_script', name, match_pattern, code });
+    };
+  }
+
+  function renderWorkspaces(s) {
+    const colors = ['#e5e5ea', '#64d2ff', '#30d158', '#bf5af2', '#ff9f0a', '#ff453a'];
+    bodyEl.innerHTML = `
+      <div class="page-head">
+        <h2 class="page-title">Espacios</h2>
+        <button class="head-link" id="btn-priv-new">+ Privada</button>
+      </div>
+
+      <div class="group group-pad vstack">
+        <div class="row-title">Vista Dividida</div>
+        <div class="row-sub" style="white-space:normal;">Dos pestañas lado a lado con divisor arrastrable en el centro.</div>
+        <div class="hstack">
+          <button class="btn primary" style="flex:1" id="btn-sp">${s.split_tab_id ? 'Cerrar Vista Dividida' : 'Activar Vista Dividida'}</button>
+          ${s.split_tab_id ? '<button class="btn" id="btn-swap">Intercambiar</button>' : ''}
+        </div>
+        ${s.split_tab_id ? `
+          <div class="grid3">
+            <button class="btn sm" data-ratio="0.33">33 / 67</button>
+            <button class="btn sm" data-ratio="0.5">50 / 50</button>
+            <button class="btn sm" data-ratio="0.67">67 / 33</button>
+          </div>
+        ` : ''}
+      </div>
+
+      <div class="sec-lbl"><span>Espacios y contenedores aislados</span></div>
+      <div class="group">
+        ${s.workspaces.map(w => {
+          const count = s.tabs.filter(t => t.workspace_id === w.id).length;
+          return `
+            <div class="g-row clickable ${w.id === s.active_workspace_id ? 'selected' : ''}" data-ws="${esc(w.id)}">
+              <span class="ws-dot" style="background:${esc(w.accent)}"></span>
+              <div class="row-main">
+                <div class="row-title">${esc(w.name)}</div>
+                <div class="row-sub">${count} ${count === 1 ? 'pestaña' : 'pestañas'} · ${w.isolated_container ? 'Contenedor aislado' : 'Sesión compartida'}</div>
+              </div>
+              ${w.id !== 'ws_general' ? `<button class="btn sm" data-iso="${esc(w.id)}" title="Aislar cookies y cuentas en este espacio">${w.isolated_container ? 'Aislado' : 'Aislar'}</button><button class="act del" data-del-ws="${esc(w.id)}" title="Eliminar">${IC_X}</button>` : ''}
+            </div>
+          `;
+        }).join('')}
+      </div>
+
+      <div class="hstack">
+        <input type="text" id="ws-name-in" placeholder="Nuevo espacio aislado (ej. Cliente B)..." />
+        <button class="btn" id="ws-add">Crear</button>
+      </div>
+
+      <div class="sec-lbl"><span>Todas las pestañas</span><span>${s.tabs.length}</span></div>
+      <div class="group">
+        ${s.tabs.map(t => `
+          <div class="g-row clickable ${t.id === s.active_tab_id ? 'selected' : ''}" data-tab="${t.id}">
+            <div class="row-main">
+              <div class="row-title">${esc(t.title)}</div>
+              <div class="row-sub">${t.is_private ? 'Privada · ' : ''}${t.is_hibernated ? 'Hibernada · ' : ''}${esc(t.host || t.display_url)}</div>
+            </div>
+            ${t.id !== s.active_tab_id && !t.is_hibernated ? `<button class="act" data-hib="${t.id}" title="Hibernar para ahorrar RAM">${IC_SLEEP}</button>` : ''}
+            ${t.id !== s.active_tab_id ? `<button class="act" data-sp-tab="${t.id}" title="Vista Dividida">${IC_SPLIT}</button>` : ''}
+            <button class="act del" data-cl-tab="${t.id}" title="Cerrar">${IC_X}</button>
+          </div>
+        `).join('')}
+      </div>
+    `;
+
+    document.getElementById('btn-priv-new').onclick = () => send({ cmd: 'new_tab', url: null, private: true });
+    document.getElementById('btn-sp').onclick = () => send({ cmd: s.split_tab_id ? 'close_split_view' : 'toggle_split_view', target_tab_id: null });
+    document.getElementById('btn-swap')?.addEventListener('click', () => send({ cmd: 'swap_split_view' }));
+    bodyEl.querySelectorAll('[data-ratio]').forEach(b => b.onclick = () => send({ cmd: 'set_split_ratio', ratio: Number(b.dataset.ratio) }));
+    bodyEl.querySelectorAll('[data-ws]').forEach(el => el.onclick = () => send({ cmd: 'switch_workspace', id: el.dataset.ws }));
+    bodyEl.querySelectorAll('[data-iso]').forEach(b => b.onclick = (e) => { e.stopPropagation(); send({ cmd: 'toggle_workspace_isolation', id: b.dataset.iso }); });
+    bodyEl.querySelectorAll('[data-del-ws]').forEach(b => b.onclick = (e) => { e.stopPropagation(); send({ cmd: 'delete_workspace', id: b.dataset.delWs }); });
+    document.getElementById('ws-add').onclick = () => {
+      const name = document.getElementById('ws-name-in')?.value.trim();
+      if (name) send({ cmd: 'create_workspace', name, accent: colors[s.workspaces.length % colors.length], isolated: true });
+    };
+    bodyEl.querySelectorAll('[data-tab]').forEach(el => el.onclick = () => send({ cmd: 'switch_tab', id: Number(el.dataset.tab) }));
+    bodyEl.querySelectorAll('[data-hib]').forEach(b => b.onclick = (e) => { e.stopPropagation(); send({ cmd: 'hibernate_tab', id: Number(b.dataset.hib) }); });
+    bodyEl.querySelectorAll('[data-sp-tab]').forEach(b => b.onclick = (e) => { e.stopPropagation(); send({ cmd: 'toggle_split_view', target_tab_id: Number(b.dataset.spTab) }); });
+    bodyEl.querySelectorAll('[data-cl-tab]').forEach(b => b.onclick = (e) => { e.stopPropagation(); send({ cmd: 'close_tab', id: Number(b.dataset.clTab) }); });
+  }
+
+  function renderBookmarks(s) {
+    const active = s.tabs.find(t => t.id === s.active_tab_id);
+    const q = query.toLowerCase();
+    const filtered = s.bookmarks.filter(b => !q || b.title.toLowerCase().includes(q) || b.url.toLowerCase().includes(q));
+    const availableBrowsers = (s.detected_browsers || []).filter(b => b.available);
+
+    bodyEl.innerHTML = `
+      <div class="page-head">
+        <h2 class="page-title">Marcadores</h2>
+        <button class="head-link" id="bm-bar">${s.show_bookmarks_bar ? 'Ocultar barra' : 'Mostrar barra'}</button>
+      </div>
+      <input type="text" id="bm-q" placeholder="Buscar marcadores..." value="${esc(query)}" />
+      ${active && !active.is_internal ? `<button class="btn primary" id="bm-cur">${active.is_bookmarked ? 'Quitar página actual' : 'Guardar página actual'}</button>` : ''}
+
+      ${availableBrowsers.length ? `
+        <div class="group group-pad vstack">
+          <div class="row-title">Importar marcadores en 1 clic</div>
+          <div class="hstack" style="flex-wrap:wrap;">
+            ${availableBrowsers.map(b => `<button class="btn sm" data-imp="${esc(b.id)}">Importar de ${esc(b.name)}</button>`).join('')}
+          </div>
+        </div>
+      ` : ''}
+
+      <div class="group group-pad vstack">
+        <input type="text" id="bm-t" placeholder="Nombre del marcador" />
+        <div class="hstack">
+          <input type="text" id="bm-u" placeholder="https://..." />
+          <button class="btn" id="bm-add">Añadir</button>
+        </div>
+      </div>
+
+      ${filtered.length ? `
+        <div class="group">
+          ${filtered.map(b => `
+            <div class="g-row clickable" data-open="${esc(b.url)}">
+              <div class="row-main"><div class="row-title">${esc(b.title)}</div><div class="row-sub">${esc(b.url)}</div></div>
+              <button class="act" data-nt="${esc(b.url)}" title="Nueva pestaña">${IC_EXT}</button>
+              <button class="act del" data-del="${esc(b.id)}" title="Eliminar">${IC_X}</button>
+            </div>
+          `).join('')}
+        </div>
+      ` : '<div class="empty">Sin marcadores coincidentes.</div>'}
+    `;
+    bindSearch('bm-q');
+    document.getElementById('bm-cur')?.addEventListener('click', () => send({ cmd: 'toggle_bookmark_current' }));
+    document.getElementById('bm-bar').onclick = () => send({ cmd: 'toggle_bookmarks_bar' });
+    bodyEl.querySelectorAll('[data-imp]').forEach(b => b.onclick = () => send({ cmd: 'import_bookmarks', browser_id: b.dataset.imp }));
+    document.getElementById('bm-add').onclick = () => {
+      const title = document.getElementById('bm-t').value.trim();
+      let url = document.getElementById('bm-u').value.trim();
+      if (!url) return;
+      if (!url.includes('://')) url = 'https://' + url;
+      send({ cmd: 'add_bookmark', title: title || url, url });
+    };
+    bodyEl.querySelectorAll('[data-open]').forEach(el => el.onclick = (e) => send({ cmd: 'open_url', url: el.dataset.open, new_tab: e.ctrlKey }));
+    bodyEl.querySelectorAll('[data-nt]').forEach(b => b.onclick = (e) => { e.stopPropagation(); send({ cmd: 'open_url', url: b.dataset.nt, new_tab: true }); });
+    bodyEl.querySelectorAll('[data-del]').forEach(b => b.onclick = (e) => { e.stopPropagation(); send({ cmd: 'remove_bookmark', id: b.dataset.del }); });
+  }
+
+  function renderHistory(s) {
+    const q = query.toLowerCase();
+    const filtered = s.history.filter(h => !q || h.title.toLowerCase().includes(q) || h.url.toLowerCase().includes(q));
+    const closed = (s.closed_tabs || []).filter(c => !q || c.title.toLowerCase().includes(q) || c.url.toLowerCase().includes(q));
+    bodyEl.innerHTML = `
+      <div class="page-head">
+        <h2 class="page-title">Historial</h2>
+        ${s.history.length ? `<button class="head-link danger" id="hist-clr">${confirmClearHist ? 'Confirmar borrado' : 'Limpiar'}</button>` : ''}
+      </div>
+      <input type="text" id="hist-q" placeholder="Buscar en historial..." value="${esc(query)}" />
+      ${closed.length ? `
+        <div class="sec-lbl"><span>Pestañas cerradas recientes</span><span>${closed.length}</span></div>
+        <div class="group">
+          ${closed.slice(0, 10).map(c => `
+            <div class="g-row clickable" data-reopen="${esc(c.url)}">
+              <div class="row-main"><div class="row-title">${esc(c.title)}</div><div class="row-sub">${esc(fmtTime(c.closed_at))} · ${esc(c.url)}</div></div>
+              <span class="tag ok">Reabrir</span>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+      <div class="sec-lbl"><span>Sitios visitados</span><span>${filtered.length}</span></div>
+      ${filtered.length ? `
+        <div class="group">
+          ${filtered.slice(0, 150).map(h => `
+            <div class="g-row clickable" data-open="${esc(h.url)}">
+              <div class="row-main"><div class="row-title">${esc(h.title)}</div><div class="row-sub">${esc(fmtTime(h.visited_at))} · ${esc(h.url)}</div></div>
+              <button class="act" data-nt="${esc(h.url)}" title="Nueva pestaña">${IC_EXT}</button>
+              <button class="act del" data-del="${esc(h.id)}" title="Eliminar">${IC_X}</button>
+            </div>
+          `).join('')}
+        </div>
+      ` : '<div class="empty">El historial está vacío.</div>'}
+    `;
+    bindSearch('hist-q');
+    bodyEl.querySelectorAll('[data-reopen]').forEach(el => el.onclick = () => send({ cmd: 'reopen_closed_url', url: el.dataset.reopen }));
+    document.getElementById('hist-clr')?.addEventListener('click', () => {
+      if (!confirmClearHist) { confirmClearHist = true; render(); }
+      else { confirmClearHist = false; send({ cmd: 'clear_history' }); }
+    });
+    bodyEl.querySelectorAll('[data-open]').forEach(el => el.onclick = (e) => send({ cmd: 'open_url', url: el.dataset.open, new_tab: e.ctrlKey }));
+    bodyEl.querySelectorAll('[data-nt]').forEach(b => b.onclick = (e) => { e.stopPropagation(); send({ cmd: 'open_url', url: b.dataset.nt, new_tab: true }); });
+    bodyEl.querySelectorAll('[data-del]').forEach(b => b.onclick = (e) => { e.stopPropagation(); send({ cmd: 'remove_history', id: b.dataset.del }); });
+  }
+
+  function renderDownloads(s) {
+    bodyEl.innerHTML = `
+      <div class="page-head">
+        <h2 class="page-title">Descargas</h2>
+        ${s.downloads.length ? '<button class="head-link" id="dl-clr">Limpiar</button>' : ''}
+      </div>
+      ${s.downloads.length ? `
+        <div class="group">
+          ${s.downloads.map(d => {
+            const active = d.status === 'in_progress';
+            const paused = d.status === 'paused';
+            const pct = d.total_bytes ? Math.min(100, Math.round((d.bytes_received / d.total_bytes) * 100)) : (d.status === 'completed' ? 100 : 0);
+            const stLabel = d.status === 'completed' ? 'Lista' : (active ? (pct ? pct + '%' : 'Descargando') : (paused ? 'Pausada' : 'Cancelada'));
+            const stCls = d.status === 'completed' ? 'ok' : (active ? 'Analytics' : (paused ? 'Tracker' : 'Ad'));
+            const sizeInfo = d.total_bytes ? `${fmtBytes(d.bytes_received)} / ${fmtBytes(d.total_bytes)}` : fmtBytes(d.bytes_received);
+            const spdInfo = active && d.speed_bps > 0 ? ` · ${fmtBytes(d.speed_bps)}/s` : '';
+            const dangerous = DANGEROUS_EXT_RE.test(d.filename || d.path || '');
+            const confirming = confirmExecDlId === d.id;
+            return `
+              <div class="g-row" style="flex-direction:column;align-items:stretch;gap:6px;">
+                <div class="hstack">
+                  <div class="row-main">
+                    <div class="row-title" title="${esc(d.path)}">${esc(d.filename)}</div>
+                    <div class="row-sub">${sizeInfo}${spdInfo} · ${esc(fmtTime(d.started_at))}</div>
+                  </div>
+                  ${dangerous ? '<span class="tag Tracker" title="Archivo ejecutable: verifica el origen antes de abrir">Ejecutable</span>' : ''}
+                  <span class="tag ${stCls}">${stLabel}</span>
+                  ${active ? `<button class="act" data-pdl="${esc(d.id)}" title="Pausar">${IC_PAUSE}</button><button class="act del" data-cdl="${esc(d.id)}" title="Cancelar">${IC_X}</button>` : ''}
+                  ${paused ? `<button class="act" data-resdl="${esc(d.id)}" title="Reanudar">${IC_PLAY}</button><button class="act del" data-cdl="${esc(d.id)}" title="Cancelar">${IC_X}</button>` : ''}
+                  ${d.status === 'completed' ? `<button class="act" data-odl="${esc(d.path)}" data-dlid="${esc(d.id)}" data-dang="${dangerous ? '1' : '0'}" title="${dangerous ? 'Revisar y abrir ejecutable' : 'Abrir'}">${IC_EXT}</button><button class="act" data-rdl="${esc(d.path)}" title="Mostrar en carpeta">${IC_FOLDER}</button><button class="act del" data-rmdl="${esc(d.id)}" title="Quitar">${IC_X}</button>` : ''}
+                  ${(d.status === 'failed' || d.status === 'cancelled') ? `<button class="act del" data-rmdl="${esc(d.id)}" title="Quitar">${IC_X}</button>` : ''}
+                </div>
+                ${confirming ? `
+                  <div class="err-box vstack" style="gap:6px;">
+                    <div>Archivo ejecutable (<code>${esc(d.filename)}</code>). Ábrelo solo si confías en el sitio de origen.</div>
+                    <div class="hstack">
+                      <button class="btn sm danger" data-odl-confirm="${esc(d.path)}">Confirmar y abrir</button>
+                      <button class="btn sm" data-odl-cancel="1">Cancelar</button>
+                    </div>
+                  </div>
+                ` : ''}
+                ${(active || paused) ? `<div class="dl-bar-wrap"><div class="dl-bar" style="width:${pct}%"></div></div>` : ''}
+              </div>
+            `;
+          }).join('')}
+        </div>
+      ` : '<div class="empty">Los archivos que descargues aparecerán aquí con progreso en vivo, pausa y reanudación.</div>'}
+    `;
+    document.getElementById('dl-clr')?.addEventListener('click', () => { confirmExecDlId = null; send({ cmd: 'clear_downloads' }); });
+    bodyEl.querySelectorAll('[data-pdl]').forEach(b => b.onclick = () => send({ cmd: 'pause_download', id: b.dataset.pdl }));
+    bodyEl.querySelectorAll('[data-resdl]').forEach(b => b.onclick = () => send({ cmd: 'resume_download', id: b.dataset.resdl }));
+    bodyEl.querySelectorAll('[data-cdl]').forEach(b => b.onclick = () => send({ cmd: 'cancel_download', id: b.dataset.cdl }));
+    bodyEl.querySelectorAll('[data-odl]').forEach(b => b.onclick = () => {
+      if (b.dataset.dang === '1') {
+        confirmExecDlId = confirmExecDlId === b.dataset.dlid ? null : b.dataset.dlid;
+        render();
+      } else {
+        send({ cmd: 'open_download', path: b.dataset.odl });
+      }
+    });
+    bodyEl.querySelectorAll('[data-odl-confirm]').forEach(b => b.onclick = () => {
+      confirmExecDlId = null;
+      send({ cmd: 'open_download', path: b.dataset.odlConfirm });
+      render();
+    });
+    bodyEl.querySelectorAll('[data-odl-cancel]').forEach(b => b.onclick = () => { confirmExecDlId = null; render(); });
+    bodyEl.querySelectorAll('[data-rdl]').forEach(b => b.onclick = () => send({ cmd: 'reveal_download', path: b.dataset.rdl }));
+    bodyEl.querySelectorAll('[data-rmdl]').forEach(b => b.onclick = () => {
+      if (confirmExecDlId === b.dataset.rmdl) confirmExecDlId = null;
+      send({ cmd: 'remove_download', id: b.dataset.rmdl });
+    });
+  }
+
+  function renderNotes(s) {
+    const active = s.tabs.find(t => t.id === s.active_tab_id);
+    bodyEl.innerHTML = `
+      <div class="page-head"><h2 class="page-title">Notas</h2></div>
+      <div class="group group-pad vstack">
+        <input type="text" id="nt-t" placeholder="Título" />
+        <textarea id="nt-c" placeholder="Escribe apuntes o citas..."></textarea>
+        <div class="hstack">
+          <button class="btn primary" style="flex:1" id="nt-save">Guardar</button>
+          ${active && !active.is_internal ? '<button class="btn" id="nt-att">+ Vincular página</button>' : ''}
+        </div>
+      </div>
+      ${s.notes.length ? `
+        <div class="group">
+          ${s.notes.map(n => `
+            <div class="g-row" style="align-items:flex-start;">
+              <div class="row-main">
+                <div class="row-title">${esc(n.title)}</div>
+                <div class="note-text">${esc(n.content)}</div>
+                ${n.source_url ? `<div style="margin-top:6px;"><button class="head-link ellipsis" style="padding-left:0;" title="${esc(n.source_url)}" data-open="${esc(n.source_url)}">${esc(n.source_title || n.source_url)}</button></div>` : ''}
+              </div>
+              <button class="act del" data-deln="${esc(n.id)}" title="Eliminar">${IC_X}</button>
+            </div>
+          `).join('')}
+        </div>
+      ` : '<div class="empty">Anota fragmentos o enlaces importantes mientras navegas.</div>'}
+    `;
+    const save = (att) => {
+      const title = document.getElementById('nt-t').value.trim();
+      const content = document.getElementById('nt-c').value.trim();
+      if (!content && !att) return;
+      send({ cmd: 'add_note', title, content, attach_current: att });
+    };
+    document.getElementById('nt-save').onclick = () => save(false);
+    document.getElementById('nt-att')?.addEventListener('click', () => save(true));
+    bodyEl.querySelectorAll('[data-deln]').forEach(b => b.onclick = () => send({ cmd: 'remove_note', id: b.dataset.deln }));
+    bodyEl.querySelectorAll('[data-open]').forEach(b => b.onclick = () => send({ cmd: 'open_url', url: b.dataset.open, new_tab: true }));
+  }
+
+  function renderSettings(s) {
+    const engines = [
+      { id: 'duckduckgo', name: 'DuckDuckGo', desc: 'Privado' },
+      { id: 'google', name: 'Google', desc: 'Global' },
+      { id: 'brave', name: 'Brave Search', desc: 'Independiente' },
+      { id: 'startpage', name: 'Startpage', desc: 'Sin rastreo' },
+      { id: 'bing', name: 'Bing', desc: 'Microsoft' },
+    ];
+    const layouts = [
+      { id: 'minimal', name: 'Minimalista', desc: '2 filas Safari' },
+      { id: 'compact', name: 'Compacto', desc: '1 sola fila' },
+      { id: 'vertical', name: 'Vertical', desc: 'Estilo Arc' },
+    ];
+    bodyEl.innerHTML = `
+      <div class="page-head">
+        <h2 class="page-title">Ajustes</h2>
+        <span class="tag Custom">v${esc(s.updater?.current_version || '0.5.0')}</span>
+      </div>
+
+      <div class="sec-lbl"><span>Actualizaciones automáticas (GitHub)</span></div>
+      <div class="group group-pad vstack">
+        <div class="hstack" style="justify-content:space-between;">
+          <div class="row-main">
+            <div class="row-title">Ferrum Browser v${esc(s.updater?.current_version || '0.5.0')}</div>
+            <div class="row-sub wrap">${esc(s.updater?.status_text || 'Verificación automática con firma SHA-256 desde GitHub Releases.')}</div>
+          </div>
+          ${s.updater?.available ? `<span class="tag ok">v${esc(s.updater.available.version)}</span>` : ''}
+        </div>
+        ${s.updater?.available ? `
+          ${s.updater.available.notes ? `<div class="note-text" style="margin-top:0;font-size:11.5px;">${esc(s.updater.available.notes)}</div>` : ''}
+          <div class="hstack wrap">
+            <button class="btn primary" style="flex:1" id="btn-upd-install" ${s.updater.installing ? 'disabled' : ''}>
+              ${s.updater.installing ? 'Descargando y verificando SHA-256...' : `Actualizar a v${esc(s.updater.available.version)}`}
+            </button>
+            <button class="btn sm" id="btn-upd-notes">Ver notas</button>
+          </div>
+        ` : `
+          <div class="hstack wrap">
+            <button class="btn primary" style="flex:1" id="btn-upd-check" ${s.updater?.checking ? 'disabled' : ''}>
+              ${s.updater?.checking ? 'Buscando en GitHub...' : 'Buscar actualizaciones'}
+            </button>
+            <button class="btn sm" id="btn-upd-repo">GitHub</button>
+          </div>
+        `}
+      </div>
+
+      <div class="sec-lbl"><span>Estilo de interfaz</span></div>
+      <div class="grid3">
+        ${layouts.map(l => `<button class="opt-card ${s.layout_mode === l.id ? 'selected' : ''}" data-lay="${l.id}"><div>${l.name}</div><div style="font-size:10px;color:var(--sec);margin-top:2px;font-weight:400;">${l.desc}</div></button>`).join('')}
+      </div>
+
+      <div class="sec-lbl"><span>Buscador predeterminado</span></div>
+      <div class="grid2">
+        ${engines.map(e => `<button class="opt-card ${s.search_engine === e.id ? 'selected' : ''}" data-eng="${e.id}"><div>${e.name}</div><div style="font-size:10.5px;color:var(--sec);margin-top:2px;font-weight:400;">${e.desc}</div></button>`).join('')}
+      </div>
+
+      <div class="sec-lbl"><span>Rendimiento e interfaz</span></div>
+      <div class="group">
+        <div class="g-row">
+          <div class="row-main"><div class="row-title">Hibernar pestañas inactivas</div><div class="row-sub">Libera RAM automáticamente</div></div>
+          <select id="sel-hib">
+            <option value="0" ${s.auto_hibernate_minutes === 0 ? 'selected' : ''}>Nunca</option>
+            <option value="5" ${s.auto_hibernate_minutes === 5 ? 'selected' : ''}>5 min</option>
+            <option value="15" ${s.auto_hibernate_minutes === 15 ? 'selected' : ''}>15 min</option>
+            <option value="30" ${s.auto_hibernate_minutes === 30 ? 'selected' : ''}>30 min</option>
+          </select>
+        </div>
+        <div class="g-row">
+          <div class="row-main"><div class="row-title">Sugerencias de búsqueda en vivo</div><div class="row-sub">Autocompletado web privado vía DuckDuckGo</div></div>
+          <button class="switch ${s.live_search_suggestions ? 'on' : ''}" id="sw-sug"></button>
+        </div>
+        <div class="g-row">
+          <div class="row-main"><div class="row-title">Restaurar sesión al iniciar</div><div class="row-sub">Reabre tus pestañas y espacios</div></div>
+          <button class="switch ${s.restore_session ? 'on' : ''}" id="sw-sess"></button>
+        </div>
+        <div class="g-row">
+          <div class="row-main"><div class="row-title">Barra de marcadores</div><div class="row-sub">Acceso rápido bajo las pestañas</div></div>
+          <button class="switch ${s.show_bookmarks_bar ? 'on' : ''}" id="sw-bm"></button>
+        </div>
+      </div>
+
+      <div class="sec-lbl"><span>Integración con Windows y Web Apps</span></div>
+      <div class="group group-pad vstack">
+        <div class="hstack" style="justify-content:space-between;">
+          <div class="row-main"><div class="row-title">Navegador predeterminado</div><div class="row-sub wrap">${s.windows_registered ? 'Registrado en Windows (http/https/html/pdf)' : 'Registrar sin permisos de administrador'}</div></div>
+          ${s.windows_registered ? '<span class="tag ok">Listo</span>' : ''}
+        </div>
+        <button class="btn primary" style="width:100%" id="btn-reg-win">Configurar como predeterminado</button>
+        <div class="hstack wrap">
+          <button class="btn sm" style="flex:1" id="btn-sc-win">Accesos directos</button>
+          <button class="btn sm" style="flex:1" id="btn-pwa-inst">Sitio como App</button>
+        </div>
+      </div>
+
+      <div class="sec-lbl"><span>Respaldo cifrado y Sincronización local</span></div>
+      <div class="group group-pad vstack">
+        <div class="row-sub wrap">
+          Empaqueta marcadores, ajustes, notas, userscripts y bóveda en un archivo <code>.ferrum-backup</code> cifrado (Argon2id + AES-256-GCM).
+        </div>
+        <div class="hstack">
+          <input type="text" id="sync-dir" placeholder="Carpeta de sincronización (ej. OneDrive\\Ferrum)" value="${esc(s.sync_folder_path || '')}" />
+          <button class="btn sm" id="btn-sync-browse">Examinar</button>
+        </div>
+        <input type="password" id="bkp-pass" placeholder="Clave para cifrar o descifrar respaldo (mín. 6)..." />
+        <div class="hstack wrap">
+          <button class="btn primary" style="flex:1" id="btn-bkp-exp">Exportar respaldo</button>
+          <button class="btn" style="flex:1" id="btn-bkp-sync">Guardar en Sync</button>
+        </div>
+        <div class="hstack">
+          <input type="text" id="bkp-imp-path" placeholder="Archivo .ferrum-backup a restaurar..." value="${esc(s.picked_backup_path || '')}" />
+          <button class="btn sm" id="btn-bkp-browse">Examinar</button>
+        </div>
+        <button class="btn" style="width:100%" id="btn-bkp-imp">Importar respaldo seleccionado</button>
+      </div>
+
+      <div class="sec-lbl"><span>Privacidad</span></div>
+      <div class="group group-pad">
+        <div class="row-sub wrap" style="margin-bottom:10px;">Borra cookies, caché del motor WebView2, historial y registro de descargas.</div>
+        <button class="btn danger" style="width:100%" id="btn-wipe">${confirmClearAll ? 'Confirmar limpieza completa' : 'Limpiar datos de navegación'}</button>
+      </div>
+
+      <div class="sec-lbl"><span>Atajos esenciales</span></div>
+      <div class="group">
+        <div class="g-row"><div class="row-main"><div class="row-title">Paleta de comandos</div></div><kbd>Ctrl+K</kbd></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Nueva ventana independiente</div></div><kbd>Ctrl+N</kbd></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Vista Dividida</div></div><kbd>Ctrl+\\</kbd></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Autocompletar contraseña</div></div><kbd>Ctrl+Shift+L</kbd></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Selector visual de elementos</div></div><kbd>Alt+E</kbd></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Picture-in-Picture</div></div><kbd>Alt+P</kbd></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Captura PNG / URL limpia</div></div><kbd>Ctrl+Shift+S / C</kbd></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Modo Lectura / OLED Oscuro</div></div><kbd>Alt+R / D</kbd></div>
+      </div>
+    `;
+    document.getElementById('btn-upd-check')?.addEventListener('click', () => send({ cmd: 'check_for_updates' }));
+    document.getElementById('btn-upd-install')?.addEventListener('click', () => send({ cmd: 'install_update' }));
+    document.getElementById('btn-upd-notes')?.addEventListener('click', () => {
+      const url = s.updater?.available?.html_url || s.updater?.repo_url;
+      if (url) send({ cmd: 'open_url', url, new_tab: true });
+    });
+    document.getElementById('btn-upd-repo')?.addEventListener('click', () => {
+      if (s.updater?.repo_url) send({ cmd: 'open_url', url: s.updater.repo_url, new_tab: true });
+    });
+    bodyEl.querySelectorAll('[data-lay]').forEach(b => b.onclick = () => send({ cmd: 'set_layout_mode', mode: b.dataset.lay }));
+    bodyEl.querySelectorAll('[data-eng]').forEach(b => b.onclick = () => send({ cmd: 'set_search_engine', engine: b.dataset.eng }));
+    document.getElementById('sel-hib').onchange = (e) => send({ cmd: 'set_auto_hibernate', minutes: Number(e.target.value) });
+    document.getElementById('sw-sug').onclick = () => send({ cmd: 'toggle_live_search_suggestions' });
+    document.getElementById('sw-sess').onclick = () => send({ cmd: 'toggle_restore_session' });
+    document.getElementById('sw-bm').onclick = () => send({ cmd: 'toggle_bookmarks_bar' });
+    document.getElementById('btn-reg-win').onclick = () => send({ cmd: 'register_default_browser' });
+    document.getElementById('btn-sc-win').onclick = () => send({ cmd: 'create_windows_shortcuts' });
+    document.getElementById('btn-pwa-inst').onclick = () => send({ cmd: 'install_pwa_shortcut_current' });
+    document.getElementById('sync-dir').onchange = (e) => send({ cmd: 'set_sync_folder', path: e.target.value.trim() });
+    document.getElementById('btn-sync-browse').onclick = () => send({ cmd: 'browse_folder', target: 'sync_folder' });
+    document.getElementById('btn-bkp-browse').onclick = () => send({ cmd: 'browse_backup_file' });
+    document.getElementById('btn-bkp-exp').onclick = () => {
+      const pass = document.getElementById('bkp-pass').value;
+      send({ cmd: 'export_encrypted_backup', passphrase: pass, use_sync_folder: false });
+    };
+    document.getElementById('btn-bkp-sync').onclick = () => {
+      const dir = document.getElementById('sync-dir').value.trim();
+      if (dir) send({ cmd: 'set_sync_folder', path: dir });
+      const pass = document.getElementById('bkp-pass').value;
+      send({ cmd: 'export_encrypted_backup', passphrase: pass, use_sync_folder: true });
+    };
+    document.getElementById('btn-bkp-imp').onclick = () => {
+      const p = document.getElementById('bkp-imp-path').value.trim();
+      const pass = document.getElementById('bkp-pass').value;
+      send({ cmd: 'import_encrypted_backup', path: p, passphrase: pass });
+    };
+    document.getElementById('btn-wipe').onclick = () => {
+      if (!confirmClearAll) { confirmClearAll = true; render(); }
+      else { confirmClearAll = false; send({ cmd: 'clear_all_browsing_data' }); }
+    };
+  }
+
+  // Smooth horizontal wheel scroll on top icon rail
+  const railIcons = document.getElementById('rail-icons');
+  railIcons.addEventListener('wheel', (e) => {
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      railIcons.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  // Draggable left-edge sidebar resize handle
+  const resizeEdge = document.getElementById('resize-edge');
+  let resizingPanel = false;
+  let lastResizeX = 0;
+  resizeEdge.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    resizingPanel = true;
+    lastResizeX = e.screenX;
+    resizeEdge.classList.add('dragging');
+    e.preventDefault();
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!resizingPanel) return;
+    const dx = e.screenX - lastResizeX;
+    if (Math.abs(dx) >= 2) {
+      lastResizeX = e.screenX;
+      send({ cmd: 'resize_panel_delta', dx });
+    }
+  });
+  window.addEventListener('mouseup', () => {
+    if (!resizingPanel) return;
+    resizingPanel = false;
+    resizeEdge.classList.remove('dragging');
+  });
+
+  const SEARCH_INPUT_IDS = new Set(['cmd-q', 'v-q', 'bm-q', 'hist-q']);
+  let pendingRender = false;
+  let lastStructuralSig = '';
+
+  function isTypingInFormField() {
+    const el = document.activeElement;
+    if (!el || !bodyEl.contains(el)) return false;
+    const tag = el.tagName;
+    if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return false;
+    return !SEARCH_INPUT_IDS.has(el.id);
+  }
+
+  function structuralSig(s) {
+    if (!s) return '';
+    return [
+      s.open_panel || '',
+      s.vault?.unlocked ? '1' : '0',
+      s.vault?.error || '',
+      s.vault?.generated_password || '',
+      s.vault?.entries?.length || 0,
+      s.sync_folder_path || '',
+      s.picked_backup_path || '',
+      s.extensions?.length || 0,
+      s.userscripts?.length || 0,
+      s.notes?.length || 0,
+      s.bookmarks?.length || 0,
+      s.updater?.checking ? '1' : '0',
+      s.updater?.installing ? '1' : '0',
+      s.updater?.available?.version || '',
+      s.updater?.status_text || '',
+    ].join('|');
+  }
+
+  function render() {
+    if (!state || !state.open_panel) return;
+    pendingRender = false;
+    const prevScroll = bodyEl.scrollTop;
+    document.querySelectorAll('.rbtn[data-tab]').forEach(b => {
+      b.classList.toggle('active', b.dataset.tab === state.open_panel);
+      if (b.dataset.tab === 'settings') {
+        b.classList.toggle('has-update', !!state.updater?.available);
+      }
+    });
+    switch (state.open_panel) {
+      case 'commands': renderCommands(state); break;
+      case 'shield': renderShield(state); break;
+      case 'vault': renderVault(state); break;
+      case 'extensions': renderExtensions(state); break;
+      case 'workspaces': renderWorkspaces(state); break;
+      case 'bookmarks': renderBookmarks(state); break;
+      case 'history': renderHistory(state); break;
+      case 'downloads': renderDownloads(state); break;
+      case 'notes': renderNotes(state); break;
+      case 'settings': renderSettings(state); break;
+    }
+    bodyEl.scrollTop = prevScroll;
+  }
+
+  bodyEl.addEventListener('focusout', () => {
+    setTimeout(() => {
+      if (pendingRender && !isTypingInFormField()) {
+        render();
+      }
+    }, 60);
+  });
+
+  window.__ferrumUpdateState = function(next) {
+    const prevPanel = state?.open_panel;
+    const nextSig = structuralSig(next);
+    state = next;
+    if (prevPanel !== next.open_panel) {
+      query = '';
+      confirmClearHist = false;
+      confirmClearAll = false;
+      lastStructuralSig = nextSig;
+      render();
+      bodyEl.scrollTop = 0;
+      return;
+    }
+    if (isTypingInFormField() && nextSig === lastStructuralSig) {
+      pendingRender = true;
+      return;
+    }
+    lastStructuralSig = nextSig;
+    render();
+  };
+  window.__ferrumFocusCommands = () => { const el = document.getElementById('cmd-q'); if (el) { el.focus(); el.select(); } };
+
+  send({ cmd: 'ui_ready' });
+</script>
+</body>
+</html>

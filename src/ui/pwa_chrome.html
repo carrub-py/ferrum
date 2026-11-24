@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    background: #08080a;
+    color: rgba(255, 255, 255, 0.9);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", system-ui, sans-serif;
+    font-size: 12px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .bar {
+    height: 34px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 0 6px 0 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: #08080a;
+  }
+  .left, .right { display: flex; align-items: center; gap: 2px; }
+  .right { justify-content: flex-end; }
+  .center {
+    display: flex; align-items: center; gap: 6px;
+    max-width: 440px; min-width: 0;
+    color: rgba(255, 255, 255, 0.78);
+    font-weight: 500;
+  }
+  .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .host { font-size: 11px; color: rgba(255, 255, 255, 0.36); flex-shrink: 0; }
+  .btn {
+    width: 26px; height: 24px; border: none; border-radius: 6px;
+    background: transparent; color: rgba(255, 255, 255, 0.55);
+    display: grid; place-items: center; cursor: pointer; padding: 0;
+  }
+  .btn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.09); color: #fff; }
+  .btn:disabled { opacity: 0.24; cursor: default; }
+  .btn.close:hover { background: rgba(255, 69, 58, 0.85); color: #fff; }
+  .sep { width: 1px; height: 13px; background: rgba(255, 255, 255, 0.08); margin: 0 4px; }
+  .lock { color: #30d158; display: grid; place-items: center; }
+  .toast {
+    position: fixed; top: 4px; left: 50%; transform: translateX(-50%);
+    height: 24px; padding: 0 11px; border-radius: 999px;
+    background: #1b1b22; border: 1px solid rgba(255,255,255,0.16);
+    color: #fff; font-size: 11px; display: flex; align-items: center;
+    opacity: 0; pointer-events: none; transition: opacity 160ms;
+  }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+<div class="bar" id="drag">
+  <div class="left">
+    <button class="btn" id="back" title="Atrás" disabled><svg width="13.5" height="13.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button>
+    <button class="btn" id="fwd" title="Adelante" disabled><svg width="13.5" height="13.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><polyline points="9 18 15 12 9 6"/></svg></button>
+    <button class="btn" id="reload" title="Recargar"><svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg></button>
+  </div>
+  <div class="center">
+    <span class="lock"><svg width="10.5" height="10.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></span>
+    <span class="title" id="t">Ferrum App</span>
+    <span class="host" id="h"></span>
+  </div>
+  <div class="right">
+    <button class="btn" id="copy" title="Copiar enlace limpio"><svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button>
+    <button class="btn" id="open-full" title="Abrir en ventana completa de Ferrum"><svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></button>
+    <div class="sep"></div>
+    <button class="btn" id="min" title="Minimizar"><svg width="10.5" height="10.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.25"><line x1="2" y1="6" x2="10" y2="6"/></svg></button>
+    <button class="btn" id="max" title="Maximizar"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.25"><rect x="2" y="2" width="8" height="8" rx="1.4"/></svg></button>
+    <button class="btn close" id="cls" title="Cerrar"><svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.3"><line x1="2.2" y1="2.2" x2="9.8" y2="9.8"/><line x1="9.8" y1="2.2" x2="2.2" y2="9.8"/></svg></button>
+  </div>
+</div>
+<script>
+  const send = (p) => { try { window.ipc.postMessage(JSON.stringify(p)); } catch (_) {} };
+  let toastTimer = null, lastToast = null;
+  window.__ferrumUpdateState = (s) => {
+    const active = s.tabs.find(x => x.id === s.active_tab_id);
+    if (active) {
+      document.getElementById('back').disabled = !active.can_go_back;
+      document.getElementById('fwd').disabled = !active.can_go_forward;
+      document.getElementById('t').textContent = s.pwa_title || active.title || 'Ferrum App';
+      document.getElementById('h').textContent = active.host ? '· ' + active.host.replace(/^www\./, '') : '';
+    }
+    const toast = document.getElementById('toast');
+    if (s.toast && s.toast !== lastToast) {
+      lastToast = s.toast;
+      toast.textContent = s.toast;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+    } else if (!s.toast) { lastToast = null; }
+  };
+  document.getElementById('drag').addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || e.target.closest('button')) return;
+    if (e.detail === 2) send({ cmd: 'window_toggle_maximize' });
+    else send({ cmd: 'window_drag' });
+  });
+  document.getElementById('back').onclick = () => send({ cmd: 'go_back' });
+  document.getElementById('fwd').onclick = () => send({ cmd: 'go_forward' });
+  document.getElementById('reload').onclick = () => send({ cmd: 'reload' });
+  document.getElementById('copy').onclick = () => send({ cmd: 'copy_clean_url' });
+  document.getElementById('open-full').onclick = () => send({ cmd: 'open_current_in_full_browser' });
+  document.getElementById('min').onclick = () => send({ cmd: 'window_minimize' });
+  document.getElementById('max').onclick = () => send({ cmd: 'window_toggle_maximize' });
+  document.getElementById('cls').onclick = () => send({ cmd: 'window_close' });
+  send({ cmd: 'ui_ready' });
+</script>
+</body>
+</html>

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nueva pestaña — Ferrum</title>
+<style>
+  :root {
+    --bg: #000000;
+    --surface: #0f0f12;
+    --surface-hover: #17171c;
+    --hairline: rgba(255, 255, 255, 0.075);
+    --hairline-mid: rgba(255, 255, 255, 0.14);
+    --text: rgba(255, 255, 255, 0.92);
+    --sec: rgba(255, 255, 255, 0.50);
+    --dim: rgba(255, 255, 255, 0.28);
+    --green: #30d158;
+    --purple: #bf5af2;
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    min-height: 100%;
+    background:
+      radial-gradient(760px 300px at 50% -110px, rgba(255, 255, 255, 0.055), transparent 72%),
+      var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI Variable", system-ui, sans-serif;
+    letter-spacing: -0.015em;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body.private-page {
+    background:
+      radial-gradient(760px 300px at 50% -110px, rgba(191, 90, 242, 0.13), transparent 72%),
+      #040207;
+  }
+
+  .wrap {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: clamp(28px, 7.5vh, 84px) clamp(16px, 4vw, 28px) 52px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: clamp(20px, 3.6vh, 34px);
+  }
+
+  .header { text-align: center; }
+  .wordmark {
+    margin: 0;
+    font-size: clamp(26px, 4.5vw, 34px);
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    background: linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.52) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle {
+    margin: 7px 0 0;
+    font-size: 12.5px;
+    color: var(--dim);
+    font-weight: 400;
+  }
+
+  /* Frosted Apple Search Capsule */
+  .search-form {
+    width: 100%;
+    max-width: 540px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #111115;
+    border: 1px solid var(--hairline);
+    border-radius: 14px;
+    padding: 0 12px 0 15px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.055), 0 16px 42px rgba(0,0,0,0.58);
+    transition: background 160ms var(--ease), border-color 160ms var(--ease), box-shadow 160ms var(--ease);
+  }
+  .search-form:hover { background: #141419; border-color: rgba(255,255,255,0.12); }
+  .search-form:focus-within {
+    background: #16161c;
+    border-color: rgba(255,255,255,0.24);
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.055), 0 20px 48px rgba(0,0,0,0.72);
+  }
+  .search-form input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 14px;
+  }
+  .search-form input::placeholder { color: var(--dim); }
+  .kbd-hint {
+    font-size: 11px;
+    color: var(--dim);
+    padding: 3px 7px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.05);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: color 120ms, background 120ms;
+  }
+  .kbd-hint:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+
+  /* Apple Safari Squircle Favorites */
+  .section { width: 100%; }
+  .sec-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--sec);
+    margin: 0 0 14px;
+    letter-spacing: -0.01em;
+  }
+
+  .fav-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
+    gap: 16px 12px;
+  }
+  .fav-tile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    text-decoration: none;
+    color: var(--sec);
+    cursor: pointer;
+    min-width: 0;
+    transition: color 140ms var(--ease);
+  }
+  .fav-tile:hover { color: var(--text); }
+  .fav-squircle {
+    width: 54px;
+    height: 54px;
+    border-radius: 15px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 6px 18px rgba(0,0,0,0.45);
+    display: grid;
+    place-items: center;
+    font-size: 19px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.84);
+    overflow: hidden;
+    transition: transform 160ms var(--ease), background 160ms var(--ease), border-color 160ms var(--ease);
+  }
+  .fav-squircle img { width: 24px; height: 24px; border-radius: 5px; object-fit: contain; display: block; }
+  .fav-tile:hover .fav-squircle {
+    transform: translateY(-2px) scale(1.03);
+    background: var(--surface-hover);
+    border-color: var(--hairline-mid);
+    color: #fff;
+  }
+  .fav-name {
+    max-width: 100%;
+    font-size: 11.5px;
+    font-weight: 450;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+  }
+
+  /* Recently Closed Chips */
+  .closed-strip {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .closed-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    max-width: 210px;
+    height: 28px;
+    padding: 0 10px;
+    border-radius: 999px;
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    color: var(--sec);
+    font-family: inherit;
+    font-size: 11.5px;
+    cursor: pointer;
+    transition: background 130ms, color 130ms, border-color 130ms;
+  }
+  .closed-chip:hover { background: var(--surface-hover); border-color: var(--hairline-mid); color: #fff; }
+  .closed-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Safari-style Quiet Privacy Report Card */
+  .privacy-card {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 15px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    cursor: pointer;
+    transition: background 150ms var(--ease), border-color 150ms var(--ease);
+  }
+  .privacy-card:hover { background: var(--surface-hover); border-color: var(--hairline-mid); }
+  .priv-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: rgba(48, 209, 88, 0.12);
+    color: var(--green);
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  body.private-page .priv-icon {
+    background: rgba(191, 90, 242, 0.14);
+    color: var(--purple);
+  }
+  .priv-copy { min-width: 0; flex: 1; }
+  .priv-copy strong { display: block; font-size: 13px; font-weight: 550; color: var(--text); }
+  .priv-copy span { display: block; font-size: 11.5px; color: var(--sec); margin-top: 2px; line-height: 1.4; }
+
+  /* Subtle borderless recent visits */
+  .recent-list { display: flex; flex-direction: column; gap: 2px; }
+  .recent-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 8px 10px;
+    border-radius: 9px;
+    color: var(--text);
+    text-decoration: none;
+    cursor: pointer;
+    min-width: 0;
+    transition: background 130ms var(--ease);
+  }
+  .recent-row:hover { background: rgba(255,255,255,0.055); }
+  .recent-title { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 450; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recent-host { font-size: 11.5px; color: var(--dim); white-space: nowrap; flex-shrink: 0; }
+
+  /* Non-intrusive Bottom-Right Toast matching external pages */
+  .nt-toast {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    max-width: min(360px, 76vw);
+    padding: 8px 14px;
+    border-radius: 10px;
+    background: rgba(20, 20, 26, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 160ms ease, transform 160ms ease;
+    pointer-events: none;
+    z-index: 999;
+  }
+  .nt-toast.show { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+<div class="nt-toast" id="nt-toast"></div>
+<div class="wrap">
+  <div class="header">
+    <h1 class="wordmark" id="wm">Ferrum</h1>
+    <p class="subtitle" id="sub">Espacio General</p>
+  </div>
+
+  <form class="search-form" id="search-form" autocomplete="off">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0">
+      <circle cx="11" cy="11" r="7.5"/><line x1="20" y1="20" x2="16.4" y2="16.4"/>
+    </svg>
+    <input id="q" type="text" autofocus placeholder="Buscar en la web o escribir una dirección" />
+    <span class="kbd-hint" id="btn-cmd" title="Abrir Paleta de comandos">Ctrl K</span>
+  </form>
+
+  <div class="section" id="fav-sec">
+    <h2 class="sec-title">Favoritos</h2>
+    <div class="fav-grid" id="fav-grid"></div>
+  </div>
+
+  <div class="section" id="closed-sec" style="display:none">
+    <h2 class="sec-title">Cerradas recientemente</h2>
+    <div class="closed-strip" id="closed-strip"></div>
+  </div>
+
+  <div class="privacy-card" id="privacy-card">
+    <div class="priv-icon">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/>
+      </svg>
+    </div>
+    <div class="priv-copy">
+      <strong id="priv-headline">Informe de privacidad</strong>
+      <span id="priv-detail"></span>
+    </div>
+  </div>
+
+  <div class="section" id="recent-sec" style="display:none">
+    <h2 class="sec-title">Recientes</h2>
+    <div class="recent-list" id="recent-list"></div>
+  </div>
+</div>
+
+<script>
+  const DATA = __FERRUM_NEWTAB_DATA__;
+  const send = (p) => { try { window.ipc.postMessage(JSON.stringify(p)); } catch (_) {} };
+  const engineNames = { duckduckgo: 'DuckDuckGo', google: 'Google', brave: 'Brave Search', startpage: 'Startpage', bing: 'Bing' };
+  const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (_) { return u; } };
+  const originOf = (u) => { try { return new URL(u).origin; } catch (_) { return ''; } };
+  const fmtBytes = (b) => !b ? '0 KB' : (b < 1048576 ? Math.max(1, Math.round(b / 1024)) + ' KB' : (b / 1048576).toFixed(1) + ' MB');
+
+  let toastTimer = null;
+  const toastEl = document.getElementById('nt-toast');
+  window.__ferrumShowToast = (msg) => {
+    if (!msg) return;
+    toastEl.textContent = String(msg);
+    toastEl.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
+  };
+
+  if (DATA.is_private) {
+    document.body.classList.add('private-page');
+    document.getElementById('wm').textContent = 'Navegación privada';
+    document.getElementById('sub').textContent = 'Sesión aislada · Sin historial ni cookies guardadas';
+  } else {
+    document.getElementById('sub').textContent = `${DATA.workspace_name || 'General'} · ${engineNames[DATA.search_engine] || 'DuckDuckGo'}`;
+  }
+
+  const blocked = DATA.total_blocked || 0;
+  document.getElementById('priv-headline').textContent = blocked > 0
+    ? `Ferrum ha bloqueado ${blocked} rastreadores y anuncios`
+    : 'Protección de privacidad activa';
+  const tags = [];
+  if (DATA.bytes_saved) tags.push(`${fmtBytes(DATA.bytes_saved)} ahorrados`);
+  if (DATA.https_only) tags.push('HTTPS-Only');
+  if (DATA.anti_fingerprint) tags.push('GPC');
+  tags.push(`${DATA.rules_count || 0} reglas activas`);
+  document.getElementById('priv-detail').textContent = tags.join(' · ');
+
+  const grid = document.getElementById('fav-grid');
+  const bms = (DATA.bookmarks || []).slice(0, 12);
+  if (!bms.length) document.getElementById('fav-sec').style.display = 'none';
+  for (const bm of bms) {
+    const a = document.createElement('a');
+    a.className = 'fav-tile';
+    a.href = bm.url;
+    a.title = bm.title + '\n' + bm.url;
+    const h = hostOf(bm.url);
+    const letter = (h[0] || 'F').toUpperCase();
+    const sq = document.createElement('div');
+    sq.className = 'fav-squircle';
+    const orig = originOf(bm.url);
+    if (orig && (orig.startsWith('https://') || orig.startsWith('http://'))) {
+      const img = document.createElement('img');
+      img.referrerPolicy = 'no-referrer';
+      img.src = orig + '/favicon.ico';
+      img.alt = letter;
+      img.onerror = () => { sq.textContent = letter; };
+      sq.appendChild(img);
+    } else {
+      sq.textContent = letter;
+    }
+    const nm = document.createElement('span');
+    nm.className = 'fav-name';
+    nm.textContent = bm.title;
+    a.append(sq, nm);
+    a.onclick = (e) => { e.preventDefault(); send({ cmd: 'open_url', url: bm.url, new_tab: e.ctrlKey || e.metaKey }); };
+    grid.appendChild(a);
+  }
+
+  const closed = DATA.is_private ? [] : (DATA.closed_tabs || []).slice(0, 6);
+  if (closed.length) {
+    document.getElementById('closed-sec').style.display = '';
+    const strip = document.getElementById('closed-strip');
+    for (const c of closed) {
+      const btn = document.createElement('button');
+      btn.className = 'closed-chip';
+      btn.title = 'Reabrir: ' + c.url;
+      btn.innerHTML = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="flex-shrink:0"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg><span></span>';
+      btn.querySelector('span').textContent = c.title || hostOf(c.url);
+      btn.onclick = () => send({ cmd: 'reopen_closed_url', url: c.url });
+      strip.appendChild(btn);
+    }
+  }
+
+  const recents = DATA.is_private ? [] : (DATA.recent_history || []).slice(0, 5);
+  if (recents.length) {
+    document.getElementById('recent-sec').style.display = '';
+    const list = document.getElementById('recent-list');
+    for (const h of recents) {
+      const a = document.createElement('a');
+      a.className = 'recent-row';
+      a.href = h.url;
+      a.innerHTML = '<span class="recent-title"></span><span class="recent-host"></span>';
+      a.querySelector('.recent-title').textContent = h.title;
+      a.querySelector('.recent-host').textContent = hostOf(h.url);
+      a.onclick = (e) => { e.preventDefault(); send({ cmd: 'open_url', url: h.url, new_tab: e.ctrlKey || e.metaKey }); };
+      list.appendChild(a);
+    }
+  }
+
+  document.getElementById('search-form').onsubmit = (e) => {
+    e.preventDefault();
+    const v = document.getElementById('q').value.trim();
+    if (v) send({ cmd: 'navigate', input: v });
+  };
+  document.getElementById('btn-cmd').onclick = () => send({ cmd: 'toggle_panel', panel: 'commands' });
+  document.getElementById('privacy-card').onclick = () => send({ cmd: 'toggle_panel', panel: 'shield' });
+</script>
+</body>
+</html>

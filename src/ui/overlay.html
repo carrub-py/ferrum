@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<style>
+  * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    background: #0d0d11;
+    color: rgba(255, 255, 255, 0.92);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", system-ui, sans-serif;
+    font-size: 12.5px;
+    -webkit-font-smoothing: antialiased;
+  }
+  .drop {
+    width: 100%;
+    height: 100%;
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    border-top: none;
+    border-radius: 0 0 12px 12px;
+    padding: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    background: #0d0d11;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+  .row {
+    height: 36px;
+    padding: 0 10px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: background 100ms ease;
+  }
+  .row:hover, .row.selected {
+    background: rgba(255, 255, 255, 0.09);
+  }
+  .ic {
+    width: 18px;
+    height: 18px;
+    display: grid;
+    place-items: center;
+    color: rgba(255, 255, 255, 0.45);
+    flex-shrink: 0;
+  }
+  .row.selected .ic { color: rgba(255, 255, 255, 0.9); }
+  .main { flex: 1; min-width: 0; }
+  .t { font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .s { font-size: 11px; color: rgba(255, 255, 255, 0.44); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(100, 210, 255, 0.16);
+    color: #90e0ff;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+<div class="drop" id="list"></div>
+<script>
+  const send = (p) => { try { window.ipc.postMessage(JSON.stringify(p)); } catch (_) {} };
+  const listEl = document.getElementById('list');
+  const ICONS = {
+    switch_tab: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><polyline points="10 9 14 12 10 15"/></svg>',
+    bookmark: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffd60a" stroke-width="1.8" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
+    history: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>',
+    search: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7.5"/><line x1="20" y1="20" x2="16.4" y2="16.4"/></svg>',
+    navigate: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/></svg>',
+  };
+
+  window.__ferrumUpdateOverlay = function(data) {
+    listEl.innerHTML = '';
+    const items = data.suggestions || [];
+    items.forEach((item, idx) => {
+      const row = document.createElement('div');
+      row.className = 'row' + (idx === data.selected_index ? ' selected' : '');
+      const ic = document.createElement('span');
+      ic.className = 'ic';
+      ic.innerHTML = ICONS[item.kind] || ICONS.search;
+      const main = document.createElement('div');
+      main.className = 'main';
+      const t = document.createElement('div');
+      t.className = 't';
+      t.textContent = item.title;
+      const s = document.createElement('div');
+      s.className = 's';
+      s.textContent = item.subtitle;
+      main.appendChild(t);
+      main.appendChild(s);
+      row.appendChild(ic);
+      row.appendChild(main);
+      if (item.kind === 'switch_tab') {
+        const pill = document.createElement('span');
+        pill.className = 'pill';
+        pill.textContent = 'Cambiar';
+        row.appendChild(pill);
+      }
+      row.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        send({ cmd: 'select_suggestion', index: idx });
+      });
+      listEl.appendChild(row);
+    });
+  };
+</script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+# Rust build artifacts
+/target/
+/dist/
+**/*.rs.bk
+*.pdb
+
+# Updater & runtime temp files
+*.exe.old
+*.exe.update
+*.log
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ferrum Vertical Tabs</title>
+<style>
+  :root {
+    --bg: #050507;
+    --hover: rgba(255, 255, 255, 0.06);
+    --active: #1b1b21;
+    --hairline: rgba(255, 255, 255, 0.075);
+    --text: rgba(255, 255, 255, 0.92);
+    --sec: rgba(255, 255, 255, 0.52);
+    --dim: rgba(255, 255, 255, 0.28);
+    --purple: #bf5af2;
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    border-right: 1px solid var(--hairline);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", system-ui, sans-serif;
+    font-size: 12.5px;
+    letter-spacing: -0.012em;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .vroot { display: flex; flex-direction: column; height: 100%; padding: 8px 7px; gap: 8px; }
+  body.collapsed .vroot { padding: 8px 6px; align-items: center; }
+
+  .ws-strip {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  .ws-strip::-webkit-scrollbar { display: none; }
+  body.collapsed .ws-strip {
+    flex-direction: column;
+    align-items: center;
+    max-height: 108px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    width: 100%;
+  }
+
+  .ws-chip {
+    height: 25px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--sec);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 500;
+    flex-shrink: 0;
+    transition: background 130ms, color 130ms;
+  }
+  .ws-chip:hover { background: var(--hover); color: var(--text); }
+  .ws-chip.active { background: var(--active); color: #fff; }
+  body.collapsed .ws-chip { width: 34px; padding: 0; justify-content: center; }
+  body.collapsed .ws-chip .ws-txt { display: none; }
+  .ws-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+  .pinned-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px;
+    flex-shrink: 0;
+    max-height: 118px;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .pinned-grid::-webkit-scrollbar { display: none; }
+  .pinned-grid.empty { display: none; }
+  body.collapsed .pinned-grid { grid-template-columns: 1fr; width: 100%; max-height: 112px; }
+
+  .pin-tile {
+    height: 36px;
+    border-radius: 9px;
+    background: rgba(255, 255, 255, 0.045);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    position: relative;
+    transition: background 130ms var(--ease);
+  }
+  .pin-tile:hover { background: rgba(255, 255, 255, 0.1); }
+  .pin-tile.active { background: var(--active); box-shadow: inset 0 1px 0 rgba(255,255,255,0.09); }
+  .pin-tile.hibernated { opacity: 0.52; }
+
+  .tabs-list {
+    flex: 1;
+    width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-height: 0;
+  }
+  .tabs-list::-webkit-scrollbar { width: 3px; }
+  .tabs-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 99px; }
+
+  .vtab {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 32px;
+    padding: 0 7px 0 8px;
+    border-radius: 8px;
+    color: var(--sec);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 130ms var(--ease), color 130ms var(--ease);
+  }
+  body.collapsed .vtab { width: 38px; margin: 0 auto; padding: 0; justify-content: center; }
+  .vtab:hover { background: var(--hover); color: var(--text); }
+  .vtab.active {
+    background: var(--active);
+    color: #fff;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+  .vtab.split-secondary { background: rgba(255, 255, 255, 0.075); color: var(--text); }
+  .vtab.hibernated { opacity: 0.5; }
+  .vtab.private.active { background: rgba(191, 90, 242, 0.16); }
+  .vtab.drag-over { box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55); }
+
+  .fav { width: 15px; height: 15px; border-radius: 3px; object-fit: contain; flex-shrink: 0; }
+  .fb { width: 15px; height: 15px; display: grid; place-items: center; color: var(--dim); flex-shrink: 0; }
+  .vtab.active .fb { color: var(--sec); }
+  .vtab.private .fb { color: var(--purple); }
+  .spinner {
+    width: 12px; height: 12px; border: 1.6px solid rgba(255,255,255,0.16);
+    border-top-color: rgba(255,255,255,0.85); border-radius: 50%; animation: spin 0.72s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .vtitle { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+  .vsplit {
+    font-size: 9px; font-weight: 600; padding: 1px 4px; border-radius: 4px;
+    background: rgba(255,255,255,0.14); color: #fff; flex-shrink: 0;
+  }
+  body.collapsed .vtitle, body.collapsed .vclose, body.collapsed .vaudio, body.collapsed .vsplit { display: none; }
+
+  .vclose, .vaudio {
+    width: 18px; height: 18px; border: none; border-radius: 5px;
+    background: transparent; color: var(--dim); display: grid; place-items: center;
+    cursor: pointer; padding: 0; flex-shrink: 0;
+  }
+  .vaudio { color: var(--text); }
+  .vaudio.muted { color: var(--dim); }
+  .vclose { opacity: 0; transition: opacity 120ms; }
+  .vtab:hover .vclose, .vtab.active:hover .vclose { opacity: 0.9; }
+  .vtab.active .vclose { opacity: 0.5; }
+  .vclose:hover, .vaudio:hover { background: rgba(255,255,255,0.12); color: #fff; opacity: 1 !important; }
+
+  /* Glued right below the last tab AND sticky at bottom when 15+ tabs scroll! */
+  .new-btn {
+    position: sticky;
+    bottom: 0;
+    height: 32px;
+    padding: 0 9px;
+    margin-top: 2px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(180deg, rgba(5,5,7,0.82), var(--bg) 35%);
+    color: var(--sec);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    transition: background 130ms, color 130ms;
+  }
+  .new-btn:hover { background: #14141a; color: #fff; }
+  body.collapsed .new-btn { width: 38px; margin: 2px auto 0; padding: 0; justify-content: center; }
+  body.collapsed .new-btn span { display: none; }
+
+  .vmeta {
+    font-size: 10.5px;
+    color: var(--dim);
+    padding: 0 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+  }
+  body.collapsed .vmeta { display: none; }
+
+  .vfoot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 6px;
+    border-top: 1px solid var(--hairline);
+    gap: 4px;
+    flex-shrink: 0;
+    width: 100%;
+  }
+  body.collapsed .vfoot { flex-direction: column; }
+  .fbtn {
+    height: 28px;
+    padding: 0 8px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--sec);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11.5px;
+    flex-shrink: 0;
+  }
+  .fbtn:hover { background: var(--hover); color: #fff; }
+  body.collapsed .fbtn span { display: none; }
+</style>
+</head>
+<body>
+<div class="vroot">
+  <div class="ws-strip" id="ws-strip"></div>
+  <div class="pinned-grid empty" id="pinned-grid"></div>
+  <div class="tabs-list" id="tabs-list"></div>
+  <div class="vmeta" id="vmeta"></div>
+  <div class="vfoot">
+    <button class="fbtn" id="btn-priv" title="Nueva pestaña privada (Ctrl+Shift+N)">
+      <svg width="13.5" height="13.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M2 12s3-6 10-6 10 6 10 6"/><circle cx="8" cy="15" r="2.2"/><circle cx="16" cy="15" r="2.2"/><line x1="10.2" y1="15" x2="13.8" y2="15"/></svg>
+      <span>Privada</span>
+    </button>
+    <button class="fbtn" id="btn-collapse" title="Colapsar o expandir barra vertical">
+      <svg width="13.5" height="13.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+  const send = (p) => { try { window.ipc.postMessage(JSON.stringify(p)); } catch (_) {} };
+  const wsStrip = document.getElementById('ws-strip');
+  const pinGrid = document.getElementById('pinned-grid');
+  const tabsList = document.getElementById('tabs-list');
+  const vmeta = document.getElementById('vmeta');
+  let draggedTabId = null;
+  let lastActiveTabId = null;
+
+  const SVG_GLOBE = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a13 13 0 0 1 0 18a13 13 0 0 1 0-18z"/></svg>';
+  const SVG_FERRUM = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/></svg>';
+  const SVG_PRIV = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3-6 10-6 10 6 10 6"/><circle cx="8" cy="15" r="2.2"/><circle cx="16" cy="15" r="2.2"/></svg>';
+  const SVG_X = '<svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>';
+  const SVG_VOL = '<svg width="11.5" height="11.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>';
+  const SVG_MUTE = '<svg width="11.5" height="11.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>';
+
+  function makeIcon(tab) {
+    if (tab.loading) {
+      const sp = document.createElement('span');
+      sp.className = 'spinner';
+      return sp;
+    }
+    if (tab.favicon_url && !tab.is_internal) {
+      const img = document.createElement('img');
+      img.className = 'fav';
+      img.src = tab.favicon_url;
+      img.onerror = () => img.replaceWith(makeFallback(tab));
+      return img;
+    }
+    return makeFallback(tab);
+  }
+  function makeFallback(tab) {
+    const s = document.createElement('span');
+    s.className = 'fb';
+    s.innerHTML = tab.is_private ? SVG_PRIV : (tab.is_internal ? SVG_FERRUM : SVG_GLOBE);
+    return s;
+  }
+
+  window.__ferrumUpdateState = function(s) {
+    document.body.classList.toggle('collapsed', !!s.vertical_collapsed);
+
+    wsStrip.innerHTML = '';
+    for (const w of s.workspaces) {
+      const b = document.createElement('button');
+      b.className = 'ws-chip' + (w.id === s.active_workspace_id ? ' active' : '');
+      b.title = w.name + (w.isolated_container ? ' (Contenedor aislado)' : '');
+      b.innerHTML = `<span class="ws-dot" style="background:${w.accent}"></span><span class="ws-txt"></span>`;
+      b.querySelector('.ws-txt').textContent = w.name;
+      b.onclick = () => send({ cmd: 'switch_workspace', id: w.id });
+      wsStrip.appendChild(b);
+    }
+
+    const visible = s.tabs.filter(t => t.workspace_id === s.active_workspace_id || t.id === s.active_tab_id || t.id === s.split_tab_id);
+    const pinned = visible.filter(t => t.pinned);
+    const regular = visible.filter(t => !t.pinned);
+    const hibernatedCount = visible.filter(t => t.is_hibernated).length;
+    vmeta.textContent = hibernatedCount > 0
+      ? `${visible.length} pestañas · ${hibernatedCount} dormidas`
+      : `${visible.length} ${visible.length === 1 ? 'pestaña' : 'pestañas'}`;
+
+    pinGrid.innerHTML = '';
+    pinGrid.classList.toggle('empty', pinned.length === 0);
+    for (const tab of pinned) {
+      const el = document.createElement('div');
+      el.className = 'pin-tile'
+        + (tab.id === s.active_tab_id ? ' active' : '')
+        + (tab.is_hibernated ? ' hibernated' : '');
+      el.title = tab.title + (tab.is_hibernated ? ' (Hibernada)' : '');
+      el.appendChild(makeIcon(tab));
+      el.onclick = () => send({ cmd: 'switch_tab', id: tab.id });
+      el.oncontextmenu = (e) => { e.preventDefault(); send({ cmd: 'open_tab_context', id: tab.id }); };
+      pinGrid.appendChild(el);
+    }
+
+    const prevScroll = tabsList.scrollTop;
+    let activeEl = null;
+    tabsList.innerHTML = '';
+    for (const tab of regular) {
+      const el = document.createElement('div');
+      const isAct = tab.id === s.active_tab_id;
+      const isSplit = tab.id === s.split_tab_id;
+      el.className = 'vtab'
+        + (isAct ? ' active' : '')
+        + (!isAct && isSplit ? ' split-secondary' : '')
+        + (tab.is_private ? ' private' : '')
+        + (tab.is_hibernated ? ' hibernated' : '');
+      if (isAct) activeEl = el;
+      el.title = tab.title + (tab.is_hibernated ? ' (Hibernada · clic para despertar)' : '');
+      el.draggable = true;
+      el.ondragstart = () => { draggedTabId = tab.id; };
+      el.ondragover = (e) => { e.preventDefault(); el.classList.add('drag-over'); };
+      el.ondragleave = () => el.classList.remove('drag-over');
+      el.ondrop = (e) => {
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        if (draggedTabId && draggedTabId !== tab.id) {
+          send({ cmd: 'reorder_tab', from_id: draggedTabId, to_id: tab.id });
+        }
+        draggedTabId = null;
+      };
+
+      el.appendChild(makeIcon(tab));
+      const t = document.createElement('span');
+      t.className = 'vtitle';
+      t.textContent = tab.title || 'Nueva pestaña';
+      el.appendChild(t);
+
+      if (isSplit) {
+        const sp = document.createElement('span');
+        sp.className = 'vsplit';
+        sp.textContent = '2';
+        el.appendChild(sp);
+      }
+
+      if (tab.is_playing_audio || tab.is_muted) {
+        const aud = document.createElement('button');
+        aud.className = 'vaudio' + (tab.is_muted ? ' muted' : '');
+        aud.title = tab.is_muted ? 'Activar audio (Ctrl+M)' : 'Silenciar (Ctrl+M)';
+        aud.innerHTML = tab.is_muted ? SVG_MUTE : SVG_VOL;
+        aud.onclick = (e) => { e.stopPropagation(); send({ cmd: 'toggle_mute_tab', id: tab.id }); };
+        el.appendChild(aud);
+      }
+
+      const close = document.createElement('button');
+      close.className = 'vclose';
+      close.title = 'Cerrar (Ctrl+W)';
+      close.innerHTML = SVG_X;
+      close.onclick = (e) => { e.stopPropagation(); send({ cmd: 'close_tab', id: tab.id }); };
+      el.appendChild(close);
+
+      el.onclick = () => send({ cmd: 'switch_tab', id: tab.id });
+      el.onauxclick = (e) => { if (e.button === 1) { e.preventDefault(); send({ cmd: 'close_tab', id: tab.id }); } };
+      el.oncontextmenu = (e) => { e.preventDefault(); send({ cmd: 'open_tab_context', id: s.context_tab_id === tab.id ? null : tab.id }); };
+      tabsList.appendChild(el);
+    }
+
+    // '+' button immediately below the last tab AND sticky when list overflows!
+    const addBtn = document.createElement('button');
+    addBtn.className = 'new-btn';
+    addBtn.title = 'Nueva pestaña (Ctrl+T)';
+    addBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg><span>Nueva pestaña</span>';
+    addBtn.onclick = () => send({ cmd: 'new_tab', url: null, private: false });
+    tabsList.appendChild(addBtn);
+
+    tabsList.scrollTop = prevScroll;
+    if (activeEl && s.active_tab_id !== lastActiveTabId) {
+      activeEl.scrollIntoView({ block: 'nearest' });
+    }
+    lastActiveTabId = s.active_tab_id;
+  };
+
+  document.getElementById('btn-priv').onclick = () => send({ cmd: 'new_tab', url: null, private: true });
+  document.getElementById('btn-collapse').onclick = () => send({ cmd: 'toggle_vertical_collapsed' });
+
+  send({ cmd: 'ui_ready' });
+</script>
+</body>
+</html>

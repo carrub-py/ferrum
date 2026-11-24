@@ -1,0 +1,1111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ferrum Chrome</title>
+<style>
+  :root {
+    --void: #000000;
+    --bar: #09090b;
+    --tabbar: #050507;
+    --glass: #141418;
+    --glass-active: #1d1d23;
+    --hairline: rgba(255, 255, 255, 0.075);
+    --hairline-mid: rgba(255, 255, 255, 0.13);
+    --specular: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    --text: rgba(255, 255, 255, 0.92);
+    --sec: rgba(255, 255, 255, 0.54);
+    --dim: rgba(255, 255, 255, 0.30);
+    --green: #30d158;
+    --amber: #ff9f0a;
+    --purple: #bf5af2;
+    --gold: #ffd60a;
+    --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+    background: var(--void);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+    font-size: 12.5px;
+    letter-spacing: -0.012em;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .chrome-root { display: flex; flex-direction: column; width: 100%; height: 100%; background: var(--void); }
+
+  /* ---- ROW 1: FRAMELESS UNIFIED APPLE TOOLBAR ---- */
+  .toolbar {
+    position: relative;
+    height: 42px;
+    flex-shrink: 0;
+    background: var(--bar);
+    display: grid;
+    grid-template-columns: minmax(auto, 1fr) minmax(180px, 560px) minmax(auto, 1fr);
+    align-items: center;
+    padding: 0 8px 0 10px;
+    gap: 10px;
+    border-bottom: 1px solid var(--hairline);
+    app-region: drag;
+  }
+
+  /* Compact Safari 1-row mode (44px total) — fluid sizing so tabs never vanish */
+  body.layout-compact .toolbar {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  body.layout-compact .omnibox {
+    flex: 0 1 clamp(160px, 24vw, 270px);
+    min-width: 150px;
+    transition: flex-basis 110ms var(--ease), background 150ms, border-color 150ms, box-shadow 150ms;
+  }
+  body.layout-compact .omnibox:focus-within {
+    flex: 0 1 clamp(210px, 34vw, 390px);
+  }
+  body.layout-compact .compact-tabs-host {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    flex: 1 1 120px;
+    min-width: 100px;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    app-region: no-drag;
+  }
+  body.layout-compact .compact-tabs-host::-webkit-scrollbar { display: none; }
+  body.layout-compact .tab-bar { display: none; }
+
+  /* Vertical Arc mode (slim 40px top bar, tabs live on left vertical sidebar) */
+  body.layout-vertical .toolbar { height: 40px; }
+  body.layout-vertical .tab-bar { display: none; }
+
+  .compact-tabs-host { display: none; }
+
+  .left-group, .right-group { display: flex; align-items: center; gap: 2px; min-width: 0; flex-shrink: 0; }
+  .right-group { justify-content: flex-end; }
+
+  button, input, .tab, .omnibox, .ws-btn, .bm-chip, .tabs-scroll { app-region: no-drag; }
+
+  @media (max-width: 920px) {
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 6px 0 8px;
+    }
+    .omnibox {
+      flex: 1 1 140px;
+      min-width: 110px;
+      max-width: 560px;
+    }
+    body.layout-compact .omnibox {
+      flex: 0 1 190px;
+      min-width: 120px;
+    }
+    body.layout-compact .omnibox:focus-within {
+      flex: 0 1 250px;
+    }
+  }
+
+  @media (max-width: 740px) {
+    .toolbar { gap: 5px; }
+    #btn-split, #btn-cmd { display: none; }
+  }
+
+  @media (max-width: 580px) {
+    #btn-downloads, .v-sep { display: none; }
+    .wbtn { width: 26px; }
+  }
+
+  .tbtn {
+    position: relative;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--sec);
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+    transition: background 140ms var(--ease), color 140ms var(--ease);
+  }
+  .tbtn:hover:not(:disabled) { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+  .tbtn.active { background: rgba(255, 255, 255, 0.12); color: #fff; }
+  .tbtn:disabled { opacity: 0.24; cursor: default; }
+
+  .shield-btn {
+    height: 28px;
+    padding: 0 7px;
+    border: none;
+    border-radius: 7px;
+    background: transparent;
+    color: var(--sec);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    flex-shrink: 0;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    transition: background 140ms var(--ease), color 140ms var(--ease);
+  }
+  .shield-btn:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+  .shield-btn.active { background: rgba(255, 255, 255, 0.12); color: #fff; }
+  .shield-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); flex-shrink: 0; }
+  .shield-btn.paused .shield-dot { background: var(--amber); }
+  .shield-btn.disabled .shield-dot { background: var(--dim); }
+
+  .dl-dot {
+    position: absolute; top: 5px; right: 5px;
+    width: 5px; height: 5px; border-radius: 50%; background: var(--green);
+  }
+
+  .v-sep { width: 1px; height: 14px; background: var(--hairline); margin: 0 4px; flex-shrink: 0; }
+
+  .win-ctrls { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+  .wbtn {
+    width: 31px; height: 26px; border: none; border-radius: 7px;
+    background: transparent; color: var(--sec); display: grid; place-items: center;
+    cursor: pointer; padding: 0; transition: background 130ms, color 130ms;
+  }
+  .wbtn:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
+  .wbtn.close:hover { background: rgba(255, 69, 58, 0.85); color: #fff; }
+
+  /* Fallback toast (only used when no active tab WebView exists — tucked clear of omnibox) */
+  .toast-pill {
+    position: fixed;
+    top: 7px;
+    right: 118px;
+    max-width: 240px;
+    z-index: 99;
+    height: 26px;
+    padding: 0 10px;
+    border-radius: 999px;
+    background: #1b1b22;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.65);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 160ms var(--ease);
+  }
+  .toast-pill.show { opacity: 1; }
+
+  /* ---- CENTERED SAFARI FROSTED OMNIBOX (Zero Text/Icon Overlap via Flex Flow) ---- */
+  .omnibox {
+    position: relative;
+    container-type: inline-size;
+    width: 100%;
+    min-width: 0;
+    height: 29px;
+    background: var(--glass);
+    border: 1px solid rgba(255, 255, 255, 0.065);
+    border-radius: 9px;
+    box-shadow: var(--specular);
+    display: flex;
+    align-items: center;
+    padding: 0 4px 0 8px;
+    gap: 6px;
+    overflow: hidden;
+    transition: background 150ms var(--ease), border-color 150ms var(--ease), box-shadow 150ms var(--ease);
+  }
+  .omnibox:hover { background: #17171c; border-color: rgba(255, 255, 255, 0.11); }
+  .omnibox:focus-within {
+    background: #191920;
+    border-color: rgba(255, 255, 255, 0.24);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06), var(--specular);
+  }
+  .omnibox.private-mode { background: #141019; border-color: rgba(191, 90, 242, 0.28); }
+  .omnibox.private-mode:focus-within {
+    border-color: rgba(191, 90, 242, 0.55);
+    box-shadow: 0 0 0 3px rgba(191, 90, 242, 0.12);
+  }
+
+  .sec-icon { display: grid; place-items: center; color: var(--dim); flex-shrink: 0; cursor: pointer; }
+  .sec-icon.secure { color: var(--green); opacity: 0.88; }
+  .sec-icon.private { color: var(--purple); }
+  .sec-icon.insecure { color: var(--amber); }
+
+  /* Flex-bounded field guarantees omni-display NEVER collides with left or right icons */
+  .omni-field {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+  }
+
+  .omni-display {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    overflow: hidden;
+    font-size: 12.5px;
+    font-weight: 450;
+    color: var(--text);
+    transition: opacity 100ms ease;
+  }
+  .omni-display.placeholder { color: var(--dim); font-weight: 400; }
+  .omni-display span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .omnibox:focus-within .omni-display { opacity: 0; }
+
+  #url-input {
+    width: 100%; min-width: 0; height: 100%; border: none; outline: none; background: transparent;
+    color: transparent; caret-color: #fff; font-family: inherit; font-size: 12.5px;
+    user-select: text; -webkit-user-select: text;
+  }
+  .omnibox:focus-within #url-input { color: var(--text); }
+  #url-input::placeholder { color: transparent; }
+  .omnibox:focus-within #url-input::placeholder { color: var(--dim); }
+
+  .omni-tools { display: flex; align-items: center; gap: 1px; flex-shrink: 0; }
+  .obtn {
+    height: 22px; min-width: 22px; padding: 0 4px; border: none; border-radius: 6px;
+    background: transparent; color: var(--sec); display: grid; place-items: center;
+    cursor: pointer; font-family: inherit; font-size: 11px; font-weight: 600;
+    flex-shrink: 0;
+    transition: opacity 130ms var(--ease), background 130ms var(--ease), color 130ms var(--ease);
+  }
+  /* Collapsed out of flow when idle so centered domain uses maximum horizontal space */
+  .obtn.reveal { display: none; }
+  .obtn.reveal.sticky { display: grid; }
+  .omnibox:hover:not(:focus-within) .obtn.reveal.avail { display: grid; }
+  /* While typing a URL, hide page tools completely for uncluttered full-width editing */
+  .omnibox:focus-within .obtn.reveal,
+  .omnibox:focus-within .zoom-tag { display: none !important; }
+
+  @container (max-width: 315px) {
+    .omnibox:hover:not(:focus-within) .obtn.reveal.secondary:not(.sticky) { display: none !important; }
+  }
+
+  .obtn:hover { background: rgba(255, 255, 255, 0.09); color: #fff; }
+  .obtn.active { background: rgba(255, 255, 255, 0.14); color: #fff; }
+  .obtn.bookmarked { color: var(--gold); }
+  .obtn.reload-btn { opacity: 0.48; }
+  .omnibox:hover .obtn.reload-btn, .obtn.reload-btn:hover { opacity: 1; }
+  .zoom-tag { font-variant-numeric: tabular-nums; font-size: 10.5px; padding: 0 6px; background: rgba(255,255,255,0.08); color: var(--text); }
+
+  .progress-bar {
+    position: absolute; left: 0; bottom: -1px; height: 1.5px; width: 100%;
+    overflow: hidden; pointer-events: none; opacity: 0; transition: opacity 160ms;
+  }
+  .progress-bar.visible { opacity: 1; }
+  .progress-bar::after {
+    content: ""; display: block; height: 100%; width: 30%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.72), transparent);
+    animation: slide-load 1.05s ease-in-out infinite;
+  }
+  @keyframes slide-load { 0% { transform: translateX(-110%); } 100% { transform: translateX(350%); } }
+
+  /* ---- ROW 2: FLOATING PILL TAB BAR (36px) WITH STICKY '+' GLUED TO LAST TAB ---- */
+  .tab-bar {
+    height: 36px;
+    flex-shrink: 0;
+    background: var(--tabbar);
+    border-bottom: 1px solid var(--hairline);
+    display: flex;
+    align-items: center;
+    padding: 0 8px 0 10px;
+    gap: 6px;
+    overflow: hidden;
+    app-region: drag;
+  }
+
+  .ws-btn {
+    height: 24px; padding: 0 7px; border: none; border-radius: 7px;
+    background: transparent; color: var(--sec); display: inline-flex; align-items: center; gap: 6px;
+    cursor: pointer; font-family: inherit; font-size: 11.5px; font-weight: 500; flex-shrink: 0;
+    transition: background 140ms var(--ease), color 140ms var(--ease);
+  }
+  .ws-btn:hover, .ws-btn.active { background: rgba(255, 255, 255, 0.07); color: var(--text); }
+  .ws-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+
+  .tabs-scroll {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .tabs-scroll::-webkit-scrollbar { display: none; }
+
+  .tab {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    height: 27px;
+    width: 192px;
+    min-width: 96px;
+    flex: 0 1 192px;
+    padding: 0 7px 0 9px;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--sec);
+    border: 1px solid transparent;
+    cursor: pointer;
+    overflow: hidden;
+    transition: background 150ms var(--ease), color 150ms var(--ease), box-shadow 150ms var(--ease), opacity 150ms;
+  }
+  body.layout-compact .tab { width: 152px; flex: 0 1 152px; min-width: 78px; }
+  .tab.pinned { width: 32px; min-width: 32px; flex: 0 0 32px; padding: 0; justify-content: center; }
+  .tab:hover { background: rgba(255, 255, 255, 0.055); color: var(--text); }
+  .tab.active {
+    background: var(--glass-active);
+    color: #fff;
+    box-shadow: var(--specular), 0 1px 6px rgba(0, 0, 0, 0.48);
+  }
+  .tab.split-secondary { background: rgba(255, 255, 255, 0.075); color: var(--text); }
+  .tab.hibernated { opacity: 0.52; }
+  .tab.private.active {
+    background: rgba(191, 90, 242, 0.14);
+    box-shadow: inset 0 1px 0 rgba(191, 90, 242, 0.25), 0 1px 6px rgba(0, 0, 0, 0.45);
+  }
+  .tab.drag-over { box-shadow: inset 2px 0 0 rgba(255, 255, 255, 0.65); }
+
+  .tab-icon-slot { width: 15px; height: 15px; display: grid; place-items: center; flex-shrink: 0; }
+  .tab-fav { width: 14px; height: 14px; border-radius: 3px; object-fit: contain; display: block; }
+  .tab-fallback { color: var(--dim); display: grid; place-items: center; }
+  .tab.active .tab-fallback { color: var(--sec); }
+  .tab.private .tab-fallback { color: var(--purple); }
+
+  .spinner {
+    width: 12px; height: 12px; border: 1.6px solid rgba(255,255,255,0.16);
+    border-top-color: rgba(255,255,255,0.85); border-radius: 50%; animation: spin 0.72s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .tab-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; font-weight: 450; }
+  .tab.active .tab-title { font-weight: 500; }
+
+  .split-tag {
+    font-size: 9px; font-weight: 600; padding: 1px 4px; border-radius: 4px;
+    background: rgba(255,255,255,0.14); color: #fff; flex-shrink: 0;
+  }
+  .tab-audio {
+    width: 18px; height: 18px; border: none; border-radius: 5px; background: transparent;
+    color: var(--text); display: grid; place-items: center; cursor: pointer; padding: 0; flex-shrink: 0;
+  }
+  .tab-audio:hover { background: rgba(255,255,255,0.12); }
+  .tab-audio.muted { color: var(--dim); }
+
+  .tab-close {
+    width: 17px; height: 17px; border: none; background: transparent; color: var(--dim);
+    border-radius: 5px; display: grid; place-items: center; cursor: pointer; padding: 0;
+    flex-shrink: 0; opacity: 0; transition: opacity 130ms, background 130ms, color 130ms;
+  }
+  .tab:hover .tab-close, .tab.active:hover .tab-close { opacity: 1; }
+  .tab.active .tab-close { opacity: 0.55; }
+  .tab-close:hover { background: rgba(255,255,255,0.13); color: #fff; opacity: 1 !important; }
+
+  /* Glued right next to the last tab AND sticks cleanly to the right edge when overflowing! */
+  .new-tab-btn {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    width: 26px; height: 26px; margin-left: 2px; border-radius: 7px; border: none;
+    background: var(--tabbar);
+    box-shadow: -8px 0 8px var(--tabbar);
+    color: var(--sec); display: grid; place-items: center;
+    cursor: pointer; flex-shrink: 0; transition: background 140ms, color 140ms;
+  }
+  body.layout-compact .new-tab-btn {
+    background: var(--bar);
+    box-shadow: -8px 0 8px var(--bar);
+  }
+  .new-tab-btn:hover { background: #1d1d24; color: #fff; }
+
+  /* ---- OPTIONAL STRIPS (flex-shrink: 0 prevents DPI squishing) ---- */
+  .ctx-bar, .find-bar, .bookmarks-bar, .audio-bar, .login-bar {
+    flex-shrink: 0;
+    background: #08080a; border-bottom: 1px solid var(--hairline);
+    display: flex; align-items: center; padding: 0 12px; gap: 6px;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .ctx-bar::-webkit-scrollbar, .bookmarks-bar::-webkit-scrollbar, .audio-bar::-webkit-scrollbar, .login-bar::-webkit-scrollbar { display: none; }
+  .ctx-bar, .audio-bar, .login-bar { height: 32px; }
+  .find-bar { height: 34px; }
+  .bookmarks-bar { height: 28px; }
+  .hidden { display: none !important; }
+  .pill-btn.accent { background: #fff; color: #000; font-weight: 600; }
+  .pill-btn.accent:hover { background: rgba(255,255,255,0.88); }
+
+  .ctx-label {
+    color: var(--dim); font-size: 11.5px; font-weight: 500; flex-shrink: 0;
+    max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 4px;
+  }
+  .pill-btn {
+    height: 22px; padding: 0 9px; border-radius: 6px; border: none; flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.07); color: var(--text); font-family: inherit;
+    font-size: 11px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background 120ms;
+  }
+  .pill-btn:hover { background: rgba(255, 255, 255, 0.14); }
+  .pill-btn.danger:hover { background: rgba(255, 69, 58, 0.22); color: #ff8a80; }
+
+  .find-input {
+    width: 240px; max-width: 48vw; height: 23px; background: var(--glass); border: 1px solid var(--hairline-mid);
+    border-radius: 6px; color: var(--text); padding: 0 9px; font-family: inherit; font-size: 12px;
+    outline: none; user-select: text; -webkit-user-select: text;
+  }
+  .find-count { font-size: 11px; color: var(--sec); font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; flex-shrink: 0; }
+
+  .bm-chip {
+    display: inline-flex; align-items: center; height: 20px; max-width: 160px; padding: 0 7px;
+    border-radius: 6px; border: none; background: transparent; color: var(--sec); cursor: pointer;
+    font-family: inherit; font-size: 11.5px; flex-shrink: 0; transition: background 120ms, color 120ms;
+  }
+  .bm-chip:hover { background: rgba(255, 255, 255, 0.075); color: #fff; }
+  .bm-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="toast-pill" id="toast-pill"></div>
+
+<div class="chrome-root">
+  <!-- ROW 1: UNIFIED APPLE TOOLBAR -->
+  <div class="toolbar" id="toolbar-drag">
+    <div class="left-group">
+      <button class="tbtn" id="btn-sidebar" title="Panel lateral">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="16" rx="3"/><line x1="15.5" y1="4" x2="15.5" y2="20"/>
+        </svg>
+      </button>
+      <button class="tbtn" id="btn-back" title="Atrás (Alt+←)" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </button>
+      <button class="tbtn" id="btn-forward" title="Adelante (Alt+→)" disabled>
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </button>
+    </div>
+
+    <form class="omnibox" id="omnibox-form" autocomplete="off">
+      <span class="sec-icon" id="sec-icon" title="Seguridad y cookies de este sitio"></span>
+      <div class="omni-field">
+        <div class="omni-display placeholder" id="omni-display">
+          <span id="omni-host">Buscar o escribir dirección web</span>
+        </div>
+        <input id="url-input" type="text" spellcheck="false" placeholder="Buscar o escribir dirección web" />
+      </div>
+      <div class="omni-tools">
+        <button type="button" class="obtn" id="btn-key" style="display:none;color:#ffd60a" title="Autocompletar desde Bóveda (Ctrl+Shift+L)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="8" cy="14" r="4"/><path d="M11 11l9-9"/><path d="M17 5l3 3"/></svg>
+        </button>
+        <button type="button" class="obtn zoom-tag" id="btn-zoom" style="display:none" title="Restablecer zoom (Ctrl+0)">100%</button>
+        <button type="button" class="obtn reveal secondary" id="btn-pip" title="Picture-in-Picture (Alt+P)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="4" width="20" height="16" rx="2.5"/><rect x="12" y="11" width="7" height="6" rx="1" fill="currentColor" stroke="none"/></svg>
+        </button>
+        <button type="button" class="obtn reveal secondary" id="btn-reader" title="Modo Lectura (Alt+R)">Aa</button>
+        <button type="button" class="obtn reveal secondary" id="btn-dark" title="Modo Oscuro OLED (Alt+D)">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+        <button type="button" class="obtn reveal" id="btn-star" title="Guardar marcador (Ctrl+D)">
+          <svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        </button>
+        <button type="button" class="obtn reload-btn" id="btn-reload" title="Recargar (Ctrl+R)">
+          <svg id="icon-reload" width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+          <svg id="icon-stop" style="display:none" width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </form>
+
+    <!-- Compact Safari 1-row tabs live cleanly right here -->
+    <div class="compact-tabs-host" id="compact-tabs-host"></div>
+
+    <div class="right-group">
+      <button class="shield-btn" id="btn-audio-hub" style="display:none" title="Control de audio en pestañas">
+        <svg width="13.5" height="13.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5.5a9.5 9.5 0 0 1 0 13"/></svg>
+        <span id="audio-count">1</span>
+      </button>
+      <button class="shield-btn" id="btn-shield" title="Escudo de Privacidad y Seguridad">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/></svg>
+        <span class="shield-dot"></span>
+        <span id="shield-count" style="display:none">0</span>
+      </button>
+      <button class="tbtn" id="btn-split" title="Vista Dividida (Ctrl+\)">
+        <svg width="14.5" height="14.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+      </button>
+      <button class="tbtn" id="btn-downloads" title="Descargas (Ctrl+J)">
+        <svg width="14.5" height="14.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span class="dl-dot" id="dl-dot" style="display:none"></span>
+      </button>
+      <button class="tbtn" id="btn-cmd" title="Paleta de comandos (Ctrl+K)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M18 3a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3 3 3 0 0 0 3-3 3 3 0 0 0-3-3H6a3 3 0 0 0-3 3 3 3 0 0 0 3 3 3 3 0 0 0 3-3V6a3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3h12a3 3 0 0 0 3-3 3 3 0 0 0-3-3z"/></svg>
+      </button>
+      <div class="v-sep"></div>
+      <div class="win-ctrls">
+        <button class="wbtn" id="win-min" title="Minimizar"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"><line x1="2" y1="6" x2="10" y2="6"/></svg></button>
+        <button class="wbtn" id="win-max" title="Maximizar / Restaurar">
+          <svg id="ic-max" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="2" y="2" width="8" height="8" rx="1.5"/></svg>
+          <svg id="ic-unmax" style="display:none" width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="1.8" y="3.4" width="6.8" height="6.8" rx="1.2"/><path d="M3.6 3.4V2.5a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-.9"/></svg>
+        </button>
+        <button class="wbtn close" id="win-close" title="Cerrar"><svg width="10.5" height="10.5" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round"><line x1="2.2" y1="2.2" x2="9.8" y2="9.8"/><line x1="9.8" y1="2.2" x2="2.2" y2="9.8"/></svg></button>
+      </div>
+    </div>
+
+    <div class="progress-bar" id="progress-bar"></div>
+  </div>
+
+  <!-- ROW 2: FLOATING PILL TAB BAR (Minimal Mode — Pinned Workspace + Scrollable Tabs + Sticky '+') -->
+  <div class="tab-bar" id="tab-bar">
+    <button class="ws-btn" id="btn-workspace" title="Espacios de trabajo">
+      <span class="ws-dot" id="ws-dot"></span>
+      <span id="ws-name">General</span>
+    </button>
+    <div class="tabs-scroll" id="tabs-inline"></div>
+  </div>
+
+  <div class="ctx-bar hidden" id="ctx-bar"></div>
+  <div class="audio-bar hidden" id="audio-bar"></div>
+  <div class="login-bar hidden" id="login-bar"></div>
+
+  <div class="find-bar hidden" id="find-bar">
+    <input class="find-input" id="find-input" type="text" placeholder="Buscar en esta página..." spellcheck="false" />
+    <span class="find-count" id="find-count">0 / 0</span>
+    <button class="pill-btn" id="find-case" title="Distinguir mayúsculas">Aa</button>
+    <button class="pill-btn" id="find-prev" title="Anterior">↑</button>
+    <button class="pill-btn" id="find-next" title="Siguiente">↓</button>
+    <button class="tbtn" id="find-close" style="margin-left:auto" title="Cerrar (Esc)">
+      <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>
+    </button>
+  </div>
+
+  <div class="bookmarks-bar hidden" id="bookmarks-bar"></div>
+</div>
+
+<script>
+  const send = (p) => { try { window.ipc.postMessage(JSON.stringify(p)); } catch (_) {} };
+
+  let state = null;
+  let editingUrl = false;
+  let findCaseSensitive = false;
+  let draggedTabId = null;
+  let lastActiveTabId = null;
+  let toastTimer = null;
+
+  const tabsInline = document.getElementById('tabs-inline');
+  const compactHost = document.getElementById('compact-tabs-host');
+  const tabBar = document.getElementById('tab-bar');
+  const urlInput = document.getElementById('url-input');
+  const omnibox = document.getElementById('omnibox-form');
+  const omniDisplay = document.getElementById('omni-display');
+  const omniHost = document.getElementById('omni-host');
+  const secIcon = document.getElementById('sec-icon');
+  const btnBack = document.getElementById('btn-back');
+  const btnForward = document.getElementById('btn-forward');
+  const btnSidebar = document.getElementById('btn-sidebar');
+  const btnWorkspace = document.getElementById('btn-workspace');
+  const wsDot = document.getElementById('ws-dot');
+  const wsName = document.getElementById('ws-name');
+  const btnZoom = document.getElementById('btn-zoom');
+  const btnKey = document.getElementById('btn-key');
+  const btnAudioHub = document.getElementById('btn-audio-hub');
+  const audioCount = document.getElementById('audio-count');
+  const audioBar = document.getElementById('audio-bar');
+  const loginBar = document.getElementById('login-bar');
+  const btnPip = document.getElementById('btn-pip');
+  const btnReader = document.getElementById('btn-reader');
+  const btnDark = document.getElementById('btn-dark');
+  const btnStar = document.getElementById('btn-star');
+  const btnReload = document.getElementById('btn-reload');
+  const iconReload = document.getElementById('icon-reload');
+  const iconStop = document.getElementById('icon-stop');
+  const btnSplit = document.getElementById('btn-split');
+  const btnDownloads = document.getElementById('btn-downloads');
+  const dlDot = document.getElementById('dl-dot');
+  const btnShield = document.getElementById('btn-shield');
+  const shieldCount = document.getElementById('shield-count');
+  const btnCmd = document.getElementById('btn-cmd');
+  const progressBar = document.getElementById('progress-bar');
+  const ctxBar = document.getElementById('ctx-bar');
+  const findBar = document.getElementById('find-bar');
+  const findInput = document.getElementById('find-input');
+  const findCount = document.getElementById('find-count');
+  const findCaseBtn = document.getElementById('find-case');
+  const bookmarksBar = document.getElementById('bookmarks-bar');
+  const icMax = document.getElementById('ic-max');
+  const icUnmax = document.getElementById('ic-unmax');
+  const toastPill = document.getElementById('toast-pill');
+
+  const SVG_LOCK = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+  const SVG_SEARCH = '<svg width="11.5" height="11.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7.5"/><line x1="20" y1="20" x2="16.4" y2="16.4"/></svg>';
+  const SVG_WARN = '<svg width="11.5" height="11.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+  const SVG_PRIV = '<svg width="12.5" height="12.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M2 12s3-6 10-6 10 6 10 6"/><circle cx="8" cy="15" r="2.2"/><circle cx="16" cy="15" r="2.2"/><line x1="10.2" y1="15" x2="13.8" y2="15"/></svg>';
+  const SVG_GLOBE = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a13 13 0 0 1 0 18a13 13 0 0 1 0-18z"/></svg>';
+  const SVG_FERRUM = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/></svg>';
+  const SVG_VOL = '<svg width="11.5" height="11.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>';
+  const SVG_MUTE = '<svg width="11.5" height="11.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/></svg>';
+
+  // Smooth horizontal mouse-wheel scrolling on tab strips
+  [tabsInline, compactHost].forEach(strip => {
+    strip.addEventListener('wheel', (e) => {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        strip.scrollLeft += e.deltaY;
+        e.preventDefault();
+      }
+    }, { passive: false });
+  });
+
+  function createTabIcon(tab) {
+    const slot = document.createElement('div');
+    slot.className = 'tab-icon-slot';
+    if (tab.loading) {
+      const sp = document.createElement('div');
+      sp.className = 'spinner';
+      slot.appendChild(sp);
+      return slot;
+    }
+    if (tab.favicon_url && !tab.is_internal) {
+      const img = document.createElement('img');
+      img.className = 'tab-fav';
+      img.src = tab.favicon_url;
+      img.onerror = () => { slot.innerHTML = `<span class="tab-fallback">${tab.is_private ? SVG_PRIV : SVG_GLOBE}</span>`; };
+      slot.appendChild(img);
+      return slot;
+    }
+    const fb = document.createElement('span');
+    fb.className = 'tab-fallback';
+    fb.innerHTML = tab.is_private ? SVG_PRIV : (tab.is_internal ? SVG_FERRUM : SVG_GLOBE);
+    slot.appendChild(fb);
+    return slot;
+  }
+
+  function renderTabs(s) {
+    const host = s.layout_mode === 'compact' ? compactHost : tabsInline;
+    if (s.layout_mode === 'compact') tabsInline.innerHTML = '';
+    else compactHost.innerHTML = '';
+    if (s.layout_mode === 'vertical') {
+      tabsInline.innerHTML = '';
+      compactHost.innerHTML = '';
+      return;
+    }
+
+    const prevScrollLeft = host.scrollLeft;
+    let activeEl = null;
+    host.innerHTML = '';
+
+    const visibleTabs = s.tabs.filter(t => t.workspace_id === s.active_workspace_id || t.id === s.active_tab_id || t.id === s.split_tab_id);
+    const ordered = [...visibleTabs.filter(t => t.pinned), ...visibleTabs.filter(t => !t.pinned)];
+
+    for (const tab of ordered) {
+      const el = document.createElement('div');
+      let cls = 'tab';
+      if (tab.pinned) cls += ' pinned';
+      if (tab.id === s.active_tab_id) { cls += ' active'; activeEl = el; }
+      else if (tab.id === s.split_tab_id) cls += ' split-secondary';
+      if (tab.is_private) cls += ' private';
+      if (tab.is_hibernated) cls += ' hibernated';
+      el.className = cls;
+      el.title = tab.title + (tab.host ? ' — ' + tab.host : '') + (tab.is_hibernated ? ' (Hibernada)' : '');
+      el.draggable = true;
+      el.ondragstart = () => { draggedTabId = tab.id; };
+      el.ondragover = (e) => { e.preventDefault(); el.classList.add('drag-over'); };
+      el.ondragleave = () => el.classList.remove('drag-over');
+      el.ondrop = (e) => {
+        e.preventDefault();
+        el.classList.remove('drag-over');
+        if (draggedTabId && draggedTabId !== tab.id) {
+          send({ cmd: 'reorder_tab', from_id: draggedTabId, to_id: tab.id });
+        }
+        draggedTabId = null;
+      };
+
+      el.appendChild(createTabIcon(tab));
+
+      if (!tab.pinned) {
+        const title = document.createElement('span');
+        title.className = 'tab-title';
+        title.textContent = tab.title || 'Nueva pestaña';
+        el.appendChild(title);
+
+        if (tab.id === s.split_tab_id) {
+          const st = document.createElement('span');
+          st.className = 'split-tag';
+          st.textContent = '2';
+          el.appendChild(st);
+        }
+
+        if (tab.is_playing_audio || tab.is_muted) {
+          const aud = document.createElement('button');
+          aud.className = 'tab-audio' + (tab.is_muted ? ' muted' : '');
+          aud.title = tab.is_muted ? 'Activar audio (Ctrl+M)' : 'Silenciar (Ctrl+M)';
+          aud.innerHTML = tab.is_muted ? SVG_MUTE : SVG_VOL;
+          aud.onclick = (e) => { e.stopPropagation(); send({ cmd: 'toggle_mute_tab', id: tab.id }); };
+          el.appendChild(aud);
+        }
+
+        const close = document.createElement('button');
+        close.className = 'tab-close';
+        close.title = 'Cerrar (Ctrl+W)';
+        close.innerHTML = '<svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>';
+        close.onclick = (e) => { e.stopPropagation(); send({ cmd: 'close_tab', id: tab.id }); };
+        el.appendChild(close);
+      }
+
+      el.onclick = () => { if (tab.id !== s.active_tab_id) send({ cmd: 'switch_tab', id: tab.id }); };
+      el.onauxclick = (e) => { if (e.button === 1) { e.preventDefault(); send({ cmd: 'close_tab', id: tab.id }); } };
+      el.oncontextmenu = (e) => {
+        e.preventDefault();
+        send({ cmd: 'open_tab_context', id: s.context_tab_id === tab.id ? null : tab.id });
+      };
+      host.appendChild(el);
+    }
+
+    // '+' BUTTON ATTACHED IMMEDIATELY NEXT TO THE LAST TAB (AND STICKY AT RIGHT EDGE ON OVERFLOW)
+    const addBtn = document.createElement('button');
+    addBtn.className = 'new-tab-btn';
+    addBtn.title = 'Nueva pestaña (Ctrl+T)';
+    addBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+    addBtn.onclick = () => send({ cmd: 'new_tab', url: null, private: false });
+    host.appendChild(addBtn);
+
+    host.scrollLeft = prevScrollLeft;
+    if (activeEl && s.active_tab_id !== lastActiveTabId) {
+      activeEl.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+    }
+    lastActiveTabId = s.active_tab_id;
+  }
+
+  function renderContextBar(s) {
+    const tab = s.context_tab_id ? s.tabs.find(t => t.id === s.context_tab_id) : null;
+    ctxBar.classList.toggle('hidden', !tab);
+    if (!tab) return;
+    ctxBar.innerHTML = '';
+    const lbl = document.createElement('span');
+    lbl.className = 'ctx-label';
+    lbl.textContent = tab.title || 'Pestaña';
+    ctxBar.appendChild(lbl);
+
+    const mk = (text, fn, cls = '') => {
+      const b = document.createElement('button');
+      b.className = 'pill-btn ' + cls;
+      b.textContent = text;
+      b.onclick = fn;
+      ctxBar.appendChild(b);
+    };
+    mk(tab.pinned ? 'Desfijar' : 'Fijar', () => send({ cmd: 'toggle_pin_tab', id: tab.id }));
+    mk('Duplicar', () => send({ cmd: 'duplicate_tab', id: tab.id }));
+    mk(tab.is_muted ? 'Activar audio' : 'Silenciar', () => send({ cmd: 'toggle_mute_tab', id: tab.id }));
+    if (tab.id !== s.active_tab_id && !tab.is_hibernated) {
+      mk('Hibernar', () => send({ cmd: 'hibernate_tab', id: tab.id }));
+    }
+    if (tab.id !== s.active_tab_id) mk('Vista dividida', () => send({ cmd: 'toggle_split_view', target_tab_id: tab.id }));
+    else if (s.split_tab_id) mk('Intercambiar', () => send({ cmd: 'swap_split_view' }));
+    mk('Nueva ventana', () => send({ cmd: 'move_tab_to_new_window', id: tab.id }));
+    if (!tab.is_internal && tab.id === s.active_tab_id) {
+      mk('Abrir como App', () => send({ cmd: 'launch_pwa_current' }));
+    }
+    for (const ws of s.workspaces) {
+      if (ws.id !== tab.workspace_id) mk('→ ' + ws.name, () => send({ cmd: 'move_tab_to_workspace', tab_id: tab.id, workspace_id: ws.id }));
+    }
+    mk('Cerrar otras', () => send({ cmd: 'close_other_tabs', id: tab.id }), 'danger');
+    const x = document.createElement('button');
+    x.className = 'tbtn';
+    x.style.marginLeft = 'auto';
+    x.innerHTML = '<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>';
+    x.onclick = () => send({ cmd: 'open_tab_context', id: null });
+    ctxBar.appendChild(x);
+  }
+
+  function renderBookmarksBar(bookmarks, visible) {
+    bookmarksBar.classList.toggle('hidden', !visible);
+    if (!visible) return;
+    bookmarksBar.innerHTML = '';
+    for (const bm of bookmarks) {
+      const chip = document.createElement('button');
+      chip.className = 'bm-chip';
+      chip.title = bm.title + '\n' + bm.url;
+      chip.innerHTML = `<span class="bm-label"></span>`;
+      chip.querySelector('.bm-label').textContent = bm.title;
+      chip.onclick = (e) => send({ cmd: 'open_url', url: bm.url, new_tab: e.ctrlKey || e.metaKey });
+      chip.onauxclick = (e) => { if (e.button === 1) { e.preventDefault(); send({ cmd: 'open_url', url: bm.url, new_tab: true }); } };
+      bookmarksBar.appendChild(chip);
+    }
+  }
+
+  function renderAudioBar(s) {
+    const audioTabs = s.tabs.filter(t => t.is_playing_audio || t.is_muted);
+    btnAudioHub.style.display = audioTabs.length ? '' : 'none';
+    btnAudioHub.classList.toggle('active', !!s.audio_hub_open);
+    audioCount.textContent = String(audioTabs.length);
+    audioBar.classList.toggle('hidden', !s.audio_hub_open || !audioTabs.length);
+    if (!s.audio_hub_open || !audioTabs.length) return;
+    audioBar.innerHTML = '';
+    const lbl = document.createElement('span');
+    lbl.className = 'ctx-label';
+    lbl.textContent = 'Audio activo';
+    audioBar.appendChild(lbl);
+    for (const t of audioTabs) {
+      const go = document.createElement('button');
+      go.className = 'pill-btn';
+      go.textContent = (t.title || 'Pestaña').slice(0, 26);
+      go.title = 'Ir a esta pestaña';
+      go.onclick = () => send({ cmd: 'switch_tab', id: t.id });
+      const mu = document.createElement('button');
+      mu.className = 'pill-btn';
+      mu.textContent = t.is_muted ? 'Activar' : 'Silenciar';
+      mu.onclick = () => send({ cmd: 'toggle_mute_tab', id: t.id });
+      audioBar.appendChild(go);
+      audioBar.appendChild(mu);
+    }
+    const x = document.createElement('button');
+    x.className = 'tbtn';
+    x.style.marginLeft = 'auto';
+    x.innerHTML = '<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>';
+    x.onclick = () => send({ cmd: 'toggle_audio_hub' });
+    audioBar.appendChild(x);
+  }
+
+  function renderLoginBar(s) {
+    const p = s.vault?.pending_login;
+    loginBar.classList.toggle('hidden', !p);
+    if (!p) return;
+    loginBar.innerHTML = '';
+    const lbl = document.createElement('span');
+    lbl.className = 'ctx-label';
+    lbl.style.maxWidth = 'none';
+    lbl.style.color = 'rgba(255,255,255,0.84)';
+    lbl.textContent = `¿Guardar acceso para ${p.host}${p.username ? ' (' + p.username + ')' : ''} en la Bóveda cifrada?`;
+    const save = document.createElement('button');
+    save.className = 'pill-btn accent';
+    save.textContent = s.vault.unlocked ? 'Guardar en Bóveda' : 'Desbloquear y guardar';
+    save.onclick = () => send({ cmd: 'accept_pending_login' });
+    const no = document.createElement('button');
+    no.className = 'pill-btn';
+    no.textContent = 'Ahora no';
+    no.onclick = () => send({ cmd: 'dismiss_pending_login' });
+    loginBar.appendChild(lbl);
+    loginBar.appendChild(save);
+    loginBar.appendChild(no);
+  }
+
+  let lastToast = null;
+  window.__ferrumUpdateState = function(next) {
+    state = next;
+    document.body.classList.remove('layout-minimal', 'layout-compact', 'layout-vertical');
+    document.body.classList.add('layout-' + (next.layout_mode || 'minimal'));
+
+    renderTabs(next);
+    renderContextBar(next);
+    renderAudioBar(next);
+    renderLoginBar(next);
+    renderBookmarksBar(next.bookmarks, next.show_bookmarks_bar);
+
+    if (next.toast && next.toast !== lastToast) {
+      lastToast = next.toast;
+      toastPill.textContent = next.toast;
+      toastPill.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toastPill.classList.remove('show'), 2600);
+    } else if (!next.toast) {
+      lastToast = null;
+    }
+
+    const ws = next.workspaces.find(w => w.id === next.active_workspace_id) || next.workspaces[0];
+    if (ws) { wsDot.style.background = ws.accent; wsName.textContent = ws.name; }
+    btnWorkspace.classList.toggle('active', next.open_panel === 'workspaces');
+    btnSidebar.classList.toggle('active', next.open_panel !== null);
+    btnSplit.classList.toggle('active', next.split_tab_id !== null);
+    btnDownloads.classList.toggle('active', next.open_panel === 'downloads');
+    dlDot.style.display = next.active_downloads_count > 0 ? '' : 'none';
+    btnCmd.classList.toggle('active', next.open_panel === 'commands');
+
+    icMax.style.display = next.is_maximized ? 'none' : '';
+    icUnmax.style.display = next.is_maximized ? '' : 'none';
+
+    findBar.classList.toggle('hidden', !next.find.open);
+    findCount.textContent = `${next.find.current} / ${next.find.total}`;
+    findCaseSensitive = next.find.case_sensitive;
+    findCaseBtn.style.background = findCaseSensitive ? 'rgba(255,255,255,0.2)' : '';
+
+    const active = next.tabs.find(t => t.id === next.active_tab_id);
+    if (active) {
+      btnBack.disabled = !active.can_go_back;
+      btnForward.disabled = !active.can_go_forward;
+      iconReload.style.display = active.loading ? 'none' : '';
+      iconStop.style.display = active.loading ? '' : 'none';
+      progressBar.classList.toggle('visible', active.loading);
+      omnibox.classList.toggle('private-mode', active.is_private);
+
+      if (!editingUrl) { urlInput.value = active.is_internal ? '' : active.display_url; }
+
+      if (active.is_internal) {
+        omniDisplay.classList.add('placeholder');
+        omniHost.textContent = active.is_private ? 'Privada — Buscar o escribir dirección' : 'Buscar o escribir dirección web';
+      } else {
+        omniDisplay.classList.remove('placeholder');
+        omniHost.textContent = (active.host || active.display_url).replace(/^www\./, '');
+      }
+
+      if (active.is_private) { secIcon.className = 'sec-icon private'; secIcon.innerHTML = SVG_PRIV; }
+      else if (active.is_internal) { secIcon.className = 'sec-icon'; secIcon.innerHTML = SVG_SEARCH; }
+      else if (active.display_url.startsWith('https://')) { secIcon.className = 'sec-icon secure'; secIcon.innerHTML = SVG_LOCK; }
+      else { secIcon.className = 'sec-icon insecure'; secIcon.innerHTML = SVG_WARN; }
+
+      const isWeb = !active.is_internal;
+      btnKey.style.display = (isWeb && next.vault?.has_match_for_active) ? 'grid' : 'none';
+      btnZoom.style.display = active.zoom_percent !== 100 ? 'grid' : 'none';
+      btnZoom.textContent = active.zoom_percent + '%';
+
+      btnPip.classList.toggle('avail', isWeb);
+      btnReader.classList.toggle('avail', isWeb);
+      btnReader.classList.toggle('active', isWeb && active.reader_active);
+      btnReader.classList.toggle('sticky', isWeb && active.reader_active);
+      btnDark.classList.toggle('avail', isWeb);
+      btnDark.classList.toggle('active', isWeb && active.force_dark_active);
+      btnDark.classList.toggle('sticky', isWeb && active.force_dark_active);
+      btnStar.classList.toggle('avail', isWeb);
+      btnStar.classList.toggle('bookmarked', isWeb && active.is_bookmarked);
+      btnStar.classList.toggle('sticky', isWeb && active.is_bookmarked);
+      const poly = btnStar.querySelector('polygon');
+      if (poly) poly.setAttribute('fill', isWeb && active.is_bookmarked ? 'currentColor' : 'none');
+    }
+
+    const sh = next.shield;
+    btnShield.classList.remove('paused', 'disabled', 'active');
+    if (!sh.enabled) btnShield.classList.add('disabled');
+    else if (sh.site_allowlisted) btnShield.classList.add('paused');
+    if (next.open_panel === 'shield') btnShield.classList.add('active');
+    if (sh.tab_blocked > 0) {
+      shieldCount.style.display = '';
+      shieldCount.textContent = String(sh.tab_blocked);
+    } else {
+      shieldCount.style.display = 'none';
+    }
+  };
+
+  window.__ferrumFocusOmnibox = () => { urlInput.focus(); urlInput.select(); };
+  window.__ferrumFocusFind = () => { findInput.focus(); findInput.select(); };
+
+  let hasOverlay = false;
+  function emitOmniboxQuery() {
+    const val = urlInput.value;
+    hasOverlay = val.trim().length > 0;
+    const rect = omnibox.getBoundingClientRect();
+    send({ cmd: 'omnibox_query', query: val, left: rect.left, width: rect.width });
+  }
+  // Re-align autocomplete overlay cleanly once Compact omnibox expansion finishes
+  omnibox.addEventListener('transitionend', (e) => {
+    if (e.propertyName === 'flex-basis' && editingUrl && hasOverlay) {
+      emitOmniboxQuery();
+    }
+  });
+
+  function wireDrag(el) {
+    el.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      if (e.target.closest('button, input, .tab, .omnibox, .ws-btn, .bm-chip, .tabs-scroll')) return;
+      if (e.detail === 2) send({ cmd: 'window_toggle_maximize' });
+      else send({ cmd: 'window_drag' });
+    });
+  }
+  wireDrag(document.getElementById('toolbar-drag'));
+  wireDrag(tabBar);
+
+  document.getElementById('win-min').onclick = () => send({ cmd: 'window_minimize' });
+  document.getElementById('win-max').onclick = () => send({ cmd: 'window_toggle_maximize' });
+  document.getElementById('win-close').onclick = () => send({ cmd: 'window_close' });
+
+  omnibox.onsubmit = (e) => {
+    e.preventDefault();
+    const raw = urlInput.value;
+    const useOverlay = hasOverlay;
+    hasOverlay = false;
+    editingUrl = false;
+    urlInput.blur();
+    if (useOverlay) {
+      send({ cmd: 'omnibox_key', key: 'Enter' });
+    } else {
+      send({ cmd: 'navigate', input: raw });
+    }
+  };
+  urlInput.onfocus = () => { editingUrl = true; hasOverlay = false; setTimeout(() => urlInput.select(), 0); };
+  urlInput.oninput = () => emitOmniboxQuery();
+  urlInput.onblur = () => {
+    editingUrl = false;
+    hasOverlay = false;
+    setTimeout(() => send({ cmd: 'omnibox_close' }), 120);
+    if (state) {
+      const active = state.tabs.find(t => t.id === state.active_tab_id);
+      if (active) urlInput.value = active.is_internal ? '' : active.display_url;
+    }
+  };
+  urlInput.onkeydown = (e) => {
+    if (e.key === 'Escape') {
+      editingUrl = false;
+      hasOverlay = false;
+      send({ cmd: 'omnibox_close' });
+      urlInput.blur();
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      send({ cmd: 'omnibox_key', key: e.key });
+    }
+  };
+
+  btnBack.onclick = () => send({ cmd: 'go_back' });
+  btnForward.onclick = () => send({ cmd: 'go_forward' });
+  secIcon.onclick = () => send({ cmd: 'toggle_panel', panel: 'shield' });
+  btnKey.onclick = () => send({ cmd: 'quick_autofill' });
+  btnAudioHub.onclick = () => send({ cmd: 'toggle_audio_hub' });
+  btnSidebar.onclick = () => state?.open_panel ? send({ cmd: 'close_panel' }) : send({ cmd: 'toggle_panel', panel: 'bookmarks' });
+  btnWorkspace.onclick = () => send({ cmd: 'toggle_panel', panel: 'workspaces' });
+  btnZoom.onclick = () => send({ cmd: 'zoom_reset' });
+  btnPip.onclick = () => send({ cmd: 'toggle_pip' });
+  btnReader.onclick = () => send({ cmd: 'toggle_reader_mode' });
+  btnDark.onclick = () => send({ cmd: 'toggle_force_dark' });
+  btnStar.onclick = () => send({ cmd: 'toggle_bookmark_current' });
+  btnReload.onclick = () => {
+    const active = state?.tabs.find(t => t.id === state.active_tab_id);
+    send({ cmd: active?.loading ? 'stop' : 'reload' });
+  };
+  btnSplit.onclick = () => send({ cmd: 'toggle_split_view', target_tab_id: null });
+  btnDownloads.onclick = () => send({ cmd: 'toggle_panel', panel: 'downloads' });
+  btnShield.onclick = () => send({ cmd: 'toggle_panel', panel: 'shield' });
+  btnCmd.onclick = () => send({ cmd: 'toggle_panel', panel: 'commands' });
+
+  const emitFind = (step) => send({ cmd: 'find_query', query: findInput.value, case_sensitive: findCaseSensitive, step });
+  findInput.oninput = () => emitFind(0);
+  findInput.onkeydown = (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); emitFind(e.shiftKey ? -1 : 1); }
+    else if (e.key === 'Escape') { e.preventDefault(); send({ cmd: 'close_find' }); }
+  };
+  findCaseBtn.onclick = () => { findCaseSensitive = !findCaseSensitive; emitFind(0); };
+  document.getElementById('find-prev').onclick = () => emitFind(-1);
+  document.getElementById('find-next').onclick = () => emitFind(1);
+  document.getElementById('find-close').onclick = () => send({ cmd: 'close_find' });
+
+  send({ cmd: 'ui_ready' });
+</script>
+</body>
+</html>
