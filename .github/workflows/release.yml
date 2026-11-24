@@ -35,12 +35,20 @@ jobs:
         shell: pwsh
         run: cargo build --release
 
-      - name: Package portable release & generate SHA256SUMS.txt
+      - name: Package portable ZIP, Windows Installer (Inno Setup), and SHA256SUMS.txt
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
           Copy-Item "target\release\ferrum-browser.exe" "dist\ferrum-browser.exe"
 
+          # Locate freshly generated multi-res ferrum.ico from build.rs OUT_DIR
+          $ico = Get-ChildItem -Path "target\release\build" -Recurse -Filter "ferrum.ico" |
+            Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if ($ico) {
+            Copy-Item $ico.FullName "dist\ferrum.ico"
+          }
+
+          # Portable ZIP
           $stage = "dist\zip_stage"
           New-Item -ItemType Directory -Force -Path $stage | Out-Null
           Copy-Item "dist\ferrum-browser.exe" "$stage\ferrum-browser.exe"
@@ -49,9 +57,29 @@ jobs:
           Compress-Archive -Path "$stage\*" -DestinationPath "dist\ferrum-browser-windows-x64.zip" -Force
           Remove-Item -Recurse -Force $stage
 
-          $exeHash = (Get-FileHash -Path "dist\ferrum-browser.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
-          $zipHash = (Get-FileHash -Path "dist\ferrum-browser-windows-x64.zip" -Algorithm SHA256).Hash.ToLowerInvariant()
-          $sums = "$exeHash  ferrum-browser.exe`n$zipHash  ferrum-browser-windows-x64.zip`n"
+          # Build Windows Installer via Inno Setup 6 (preinstalled on windows-latest)
+          $ver = (Select-String -Path "Cargo.toml" -Pattern '^version\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
+          $iscc = Get-Command iscc -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source
+          if (-not $iscc -and (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+            $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          }
+          if ($iscc -and (Test-Path "dist\ferrum.ico")) {
+            & $iscc "/DAppVersion=$ver" "/DSourceDir=..\dist" "installer\ferrum.iss"
+            if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed" }
+          } else {
+            Write-Warning "ISCC not found; skipping installer build"
+          }
+
+          # Compute mandatory UTF-8 SHA256SUMS.txt for all release artifacts
+          $lines = @()
+          foreach ($name in @("ferrum-browser.exe", "ferrum-browser-windows-x64.zip", "ferrum-browser-setup-x64.exe")) {
+            $p = Join-Path "dist" $name
+            if (Test-Path $p) {
+              $h = (Get-FileHash -Path $p -Algorithm SHA256).Hash.ToLowerInvariant()
+              $lines += "$h  $name"
+            }
+          }
+          $sums = ($lines -join "`n") + "`n"
           [System.IO.File]::WriteAllText((Join-Path (Get-Location) "dist\SHA256SUMS.txt"), $sums, [System.Text.UTF8Encoding]::new($false))
           Get-Content "dist\SHA256SUMS.txt"
 
@@ -63,4 +91,5 @@ jobs:
           files: |
             dist/ferrum-browser.exe
             dist/ferrum-browser-windows-x64.zip
+            dist/ferrum-browser-setup-x64.exe
             dist/SHA256SUMS.txt

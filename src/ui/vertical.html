@@ -135,6 +135,22 @@
   .vtab.hibernated { opacity: 0.5; }
   .vtab.private.active { background: rgba(191, 90, 242, 0.16); }
   .vtab.drag-over { box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.55); }
+  .vtab.grouped { margin-left: 8px; border-left: 2px solid var(--grp-c, #64d2ff); border-radius: 5px 8px 8px 5px; }
+  body.collapsed .vtab.grouped { margin-left: auto; border-left: 2px solid var(--grp-c, #64d2ff); }
+
+  .vgrp-hdr {
+    display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 7px;
+    margin-top: 3px; border-radius: 7px; cursor: pointer; flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.035); color: var(--sec);
+    transition: background 120ms, color 120ms;
+  }
+  .vgrp-hdr:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+  .vgrp-hdr.drag-over { outline: 1px dashed rgba(255,255,255,0.45); }
+  .vgrp-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .vgrp-name { flex: 1; min-width: 0; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .vgrp-cnt { font-size: 10px; color: var(--dim); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+  body.collapsed .vgrp-hdr { width: 34px; margin: 3px auto 0; justify-content: center; padding: 0; }
+  body.collapsed .vgrp-name, body.collapsed .vgrp-cnt { display: none; }
 
   .fav { width: 15px; height: 15px; border-radius: 3px; object-fit: contain; flex-shrink: 0; }
   .fb { width: 15px; height: 15px; display: grid; place-items: center; color: var(--dim); flex-shrink: 0; }
@@ -243,6 +259,9 @@
       <svg width="13.5" height="13.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><path d="M2 12s3-6 10-6 10 6 10 6"/><circle cx="8" cy="15" r="2.2"/><circle cx="16" cy="15" r="2.2"/><line x1="10.2" y1="15" x2="13.8" y2="15"/></svg>
       <span>Privada</span>
     </button>
+    <button class="fbtn" id="btn-tasks" title="Monitor de pestañas y RAM (Shift+Esc)">
+      <svg width="13.5" height="13.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+    </button>
     <button class="fbtn" id="btn-collapse" title="Colapsar o expandir barra vertical">
       <svg width="13.5" height="13.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
     </button>
@@ -326,7 +345,10 @@
     const prevScroll = tabsList.scrollTop;
     let activeEl = null;
     tabsList.innerHTML = '';
-    for (const tab of regular) {
+    const groupsById = new Map((s.tab_groups || []).map(g => [g.id, g]));
+    const renderedGroups = new Set();
+
+    function appendVTab(tab, grpColor) {
       const el = document.createElement('div');
       const isAct = tab.id === s.active_tab_id;
       const isSplit = tab.id === s.split_tab_id;
@@ -334,9 +356,15 @@
         + (isAct ? ' active' : '')
         + (!isAct && isSplit ? ' split-secondary' : '')
         + (tab.is_private ? ' private' : '')
-        + (tab.is_hibernated ? ' hibernated' : '');
+        + (tab.is_hibernated ? ' hibernated' : '')
+        + (grpColor ? ' grouped' : '');
+      if (grpColor) el.style.setProperty('--grp-c', grpColor);
       if (isAct) activeEl = el;
-      el.title = tab.title + (tab.is_hibernated ? ' (Hibernada · clic para despertar)' : '');
+      const tipParts = [tab.title || 'Nueva pestaña'];
+      if (tab.host) tipParts.push(tab.host);
+      if (tab.blocked_count > 0) tipParts.push(`${tab.blocked_count} bloqueados`);
+      if (tab.is_hibernated) tipParts.push('Hibernada · clic para despertar');
+      el.title = tipParts.join(' · ');
       el.draggable = true;
       el.ondragstart = () => { draggedTabId = tab.id; };
       el.ondragover = (e) => { e.preventDefault(); el.classList.add('drag-over'); };
@@ -385,6 +413,38 @@
       tabsList.appendChild(el);
     }
 
+    for (const tab of regular) {
+      const grp = tab.group_id ? groupsById.get(tab.group_id) : null;
+      if (grp) {
+        if (renderedGroups.has(grp.id)) continue;
+        renderedGroups.add(grp.id);
+        const members = regular.filter(t => t.group_id === grp.id);
+        const hdr = document.createElement('div');
+        hdr.className = 'vgrp-hdr';
+        hdr.title = `${grp.name} (${members.length}) · Clic para ${grp.collapsed ? 'expandir' : 'colapsar'} · Clic derecho para desagrupar`;
+        hdr.innerHTML = `<span class="vgrp-dot" style="background:${grp.color}"></span><span class="vgrp-name"></span><span class="vgrp-cnt">${grp.collapsed ? members.length + ' ▸' : '▾'}</span>`;
+        hdr.querySelector('.vgrp-name').textContent = grp.name;
+        hdr.onclick = () => send({ cmd: 'toggle_tab_group_collapse', group_id: grp.id });
+        hdr.oncontextmenu = (e) => { e.preventDefault(); send({ cmd: 'ungroup_tab_group', group_id: grp.id }); };
+        hdr.ondragover = (e) => { e.preventDefault(); hdr.classList.add('drag-over'); };
+        hdr.ondragleave = () => hdr.classList.remove('drag-over');
+        hdr.ondrop = (e) => {
+          e.preventDefault();
+          hdr.classList.remove('drag-over');
+          if (draggedTabId) send({ cmd: 'assign_tab_to_group', tab_id: draggedTabId, group_id: grp.id });
+          draggedTabId = null;
+        };
+        tabsList.appendChild(hdr);
+        for (const mt of members) {
+          if (!grp.collapsed || mt.id === s.active_tab_id || mt.id === s.split_tab_id) {
+            appendVTab(mt, grp.color);
+          }
+        }
+      } else {
+        appendVTab(tab, null);
+      }
+    }
+
     // '+' button immediately below the last tab AND sticky when list overflows!
     const addBtn = document.createElement('button');
     addBtn.className = 'new-btn';
@@ -401,6 +461,7 @@
   };
 
   document.getElementById('btn-priv').onclick = () => send({ cmd: 'new_tab', url: null, private: true });
+  document.getElementById('btn-tasks').onclick = () => send({ cmd: 'toggle_panel', panel: 'tasks' });
   document.getElementById('btn-collapse').onclick = () => send({ cmd: 'toggle_vertical_collapsed' });
 
   send({ cmd: 'ui_ready' });

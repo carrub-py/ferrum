@@ -390,6 +390,21 @@
     box-shadow: inset 0 1px 0 rgba(191, 90, 242, 0.25), 0 1px 6px rgba(0, 0, 0, 0.45);
   }
   .tab.drag-over { box-shadow: inset 2px 0 0 rgba(255, 255, 255, 0.65); }
+  .tab.grouped { border-bottom: 2px solid var(--grp-c, #64d2ff); border-bottom-left-radius: 5px; border-bottom-right-radius: 5px; }
+
+  .tgrp-pill {
+    display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px;
+    border-radius: 7px; border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.06); color: var(--text);
+    font-family: inherit; font-size: 11px; font-weight: 600; cursor: pointer;
+    flex-shrink: 0; max-width: 120px; app-region: no-drag;
+    transition: background 120ms, border-color 120ms;
+  }
+  .tgrp-pill:hover { background: rgba(255,255,255,0.12); }
+  .tgrp-pill.drag-over { outline: 1px dashed rgba(255,255,255,0.55); }
+  .tgrp-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .tgrp-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tgrp-cnt { font-size: 10px; color: var(--sec); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
   .tab-icon-slot { width: 15px; height: 15px; display: grid; place-items: center; flex-shrink: 0; }
   .tab-fav { width: 14px; height: 14px; border-radius: 3px; object-fit: contain; display: block; }
@@ -613,6 +628,8 @@
   let draggedTabId = null;
   let lastActiveTabId = null;
   let toastTimer = null;
+  let contextGroupId = null;
+  const GROUP_COLORS = ['#64d2ff', '#30d158', '#bf5af2', '#ff9f0a', '#ff375f', '#a1a1aa'];
 
   const tabsInline = document.getElementById('tabs-inline');
   const compactHost = document.getElementById('compact-tabs-host');
@@ -716,9 +733,12 @@
     host.innerHTML = '';
 
     const visibleTabs = s.tabs.filter(t => t.workspace_id === s.active_workspace_id || t.id === s.active_tab_id || t.id === s.split_tab_id);
-    const ordered = [...visibleTabs.filter(t => t.pinned), ...visibleTabs.filter(t => !t.pinned)];
+    const pinned = visibleTabs.filter(t => t.pinned);
+    const regular = visibleTabs.filter(t => !t.pinned);
+    const groupsById = new Map((s.tab_groups || []).map(g => [g.id, g]));
+    const renderedGroups = new Set();
 
-    for (const tab of ordered) {
+    function appendTabEl(tab, grp) {
       const el = document.createElement('div');
       let cls = 'tab';
       if (tab.pinned) cls += ' pinned';
@@ -726,10 +746,30 @@
       else if (tab.id === s.split_tab_id) cls += ' split-secondary';
       if (tab.is_private) cls += ' private';
       if (tab.is_hibernated) cls += ' hibernated';
+      if (grp) {
+        cls += ' grouped';
+        el.style.setProperty('--grp-c', grp.color);
+      }
       el.className = cls;
-      el.title = tab.title + (tab.host ? ' — ' + tab.host : '') + (tab.is_hibernated ? ' (Hibernada)' : '');
+
+      // Rich hover tooltip with host, group, audio, hibernation, and Shield block count
+      const tip = [tab.title || 'Nueva pestaña'];
+      if (tab.host) tip.push(tab.host);
+      if (grp) tip.push('Grupo: ' + grp.name);
+      if (tab.is_hibernated) tip.push('Hibernada');
+      if (tab.is_playing_audio) tip.push(tab.is_muted ? 'Silenciada' : 'Reproduciendo audio');
+      if (tab.blocked_count > 0) tip.push(`${tab.blocked_count} bloqueados`);
+      el.title = tip.join(' · ');
+
       el.draggable = true;
       el.ondragstart = () => { draggedTabId = tab.id; };
+      el.ondragend = (e) => {
+        // Tear-off gesture: dragging a tab far below the tab bar opens it in a new window
+        if (draggedTabId === tab.id && s.tabs.length > 1 && e.clientY > 108) {
+          send({ cmd: 'move_tab_to_new_window', id: tab.id });
+        }
+        draggedTabId = null;
+      };
       el.ondragover = (e) => { e.preventDefault(); el.classList.add('drag-over'); };
       el.ondragleave = () => el.classList.remove('drag-over');
       el.ondrop = (e) => {
@@ -777,9 +817,49 @@
       el.onauxclick = (e) => { if (e.button === 1) { e.preventDefault(); send({ cmd: 'close_tab', id: tab.id }); } };
       el.oncontextmenu = (e) => {
         e.preventDefault();
+        contextGroupId = null;
         send({ cmd: 'open_tab_context', id: s.context_tab_id === tab.id ? null : tab.id });
       };
       host.appendChild(el);
+    }
+
+    for (const tab of pinned) appendTabEl(tab, null);
+
+    for (const tab of regular) {
+      const grp = tab.group_id ? groupsById.get(tab.group_id) : null;
+      if (grp) {
+        if (renderedGroups.has(grp.id)) continue;
+        renderedGroups.add(grp.id);
+        const members = regular.filter(t => t.group_id === grp.id);
+        const pill = document.createElement('button');
+        pill.className = 'tgrp-pill';
+        pill.style.borderColor = grp.color + '55';
+        pill.title = `${grp.name} (${members.length}) · Clic para ${grp.collapsed ? 'expandir' : 'colapsar'} · Clic derecho para opciones`;
+        pill.innerHTML = `<span class="tgrp-dot" style="background:${grp.color}"></span><span class="tgrp-txt"></span>${grp.collapsed ? `<span class="tgrp-cnt">${members.length}</span>` : ''}`;
+        pill.querySelector('.tgrp-txt').textContent = grp.name;
+        pill.onclick = () => send({ cmd: 'toggle_tab_group_collapse', group_id: grp.id });
+        pill.oncontextmenu = (e) => {
+          e.preventDefault();
+          contextGroupId = contextGroupId === grp.id ? null : grp.id;
+          send({ cmd: 'open_tab_context', id: members[0]?.id ?? null });
+        };
+        pill.ondragover = (e) => { e.preventDefault(); pill.classList.add('drag-over'); };
+        pill.ondragleave = () => pill.classList.remove('drag-over');
+        pill.ondrop = (e) => {
+          e.preventDefault();
+          pill.classList.remove('drag-over');
+          if (draggedTabId) send({ cmd: 'assign_tab_to_group', tab_id: draggedTabId, group_id: grp.id });
+          draggedTabId = null;
+        };
+        host.appendChild(pill);
+        for (const mt of members) {
+          if (!grp.collapsed || mt.id === s.active_tab_id || mt.id === s.split_tab_id) {
+            appendTabEl(mt, grp);
+          }
+        }
+      } else {
+        appendTabEl(tab, null);
+      }
     }
 
     // '+' BUTTON ATTACHED IMMEDIATELY NEXT TO THE LAST TAB (AND STICKY AT RIGHT EDGE ON OVERFLOW)
@@ -814,9 +894,39 @@
       b.onclick = fn;
       ctxBar.appendChild(b);
     };
+
+    if (contextGroupId) {
+      const grp = (s.tab_groups || []).find(g => g.id === contextGroupId);
+      if (grp) {
+        lbl.textContent = 'Grupo: ' + grp.name;
+        mk(grp.collapsed ? 'Expandir grupo' : 'Colapsar grupo', () => send({ cmd: 'toggle_tab_group_collapse', group_id: grp.id }));
+        const nextColor = GROUP_COLORS[(GROUP_COLORS.indexOf(grp.color) + 1) % GROUP_COLORS.length];
+        mk('Cambiar color', () => send({ cmd: 'rename_tab_group', group_id: grp.id, name: grp.name, color: nextColor }));
+        mk('Desagrupar', () => { contextGroupId = null; send({ cmd: 'ungroup_tab_group', group_id: grp.id }); });
+        mk('Cerrar grupo', () => { contextGroupId = null; send({ cmd: 'close_tab_group', group_id: grp.id }); }, 'danger');
+        const xg = document.createElement('button');
+        xg.className = 'tbtn';
+        xg.style.marginLeft = 'auto';
+        xg.innerHTML = '<svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>';
+        xg.onclick = () => { contextGroupId = null; send({ cmd: 'open_tab_context', id: null }); };
+        ctxBar.appendChild(xg);
+        return;
+      }
+      contextGroupId = null;
+    }
+
     mk(tab.pinned ? 'Desfijar' : 'Fijar', () => send({ cmd: 'toggle_pin_tab', id: tab.id }));
     mk('Duplicar', () => send({ cmd: 'duplicate_tab', id: tab.id }));
     mk(tab.is_muted ? 'Activar audio' : 'Silenciar', () => send({ cmd: 'toggle_mute_tab', id: tab.id }));
+    if (tab.group_id) {
+      mk('Quitar del grupo', () => send({ cmd: 'assign_tab_to_group', tab_id: tab.id, group_id: null }));
+    } else {
+      const nextColor = GROUP_COLORS[(s.tab_groups || []).length % GROUP_COLORS.length];
+      mk('+ Nuevo grupo', () => send({ cmd: 'create_tab_group', tab_id: tab.id, name: '', color: nextColor }));
+      for (const g of (s.tab_groups || []).filter(g => g.workspace_id === tab.workspace_id).slice(0, 3)) {
+        mk('+ ' + g.name, () => send({ cmd: 'assign_tab_to_group', tab_id: tab.id, group_id: g.id }));
+      }
+    }
     if (tab.id !== s.active_tab_id && !tab.is_hibernated) {
       mk('Hibernar', () => send({ cmd: 'hibernate_tab', id: tab.id }));
     }
@@ -1075,7 +1185,10 @@
 
   btnBack.onclick = () => send({ cmd: 'go_back' });
   btnForward.onclick = () => send({ cmd: 'go_forward' });
-  secIcon.onclick = () => send({ cmd: 'toggle_panel', panel: 'shield' });
+  secIcon.onclick = () => {
+    const rect = omnibox.getBoundingClientRect();
+    send({ cmd: 'toggle_site_info_popover', left: rect.left });
+  };
   btnKey.onclick = () => send({ cmd: 'quick_autofill' });
   btnAudioHub.onclick = () => send({ cmd: 'toggle_audio_hub' });
   btnSidebar.onclick = () => state?.open_panel ? send({ cmd: 'close_panel' }) : send({ cmd: 'toggle_panel', panel: 'bookmarks' });

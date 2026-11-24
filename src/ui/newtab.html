@@ -15,6 +15,7 @@
     --sec: rgba(255, 255, 255, 0.50);
     --dim: rgba(255, 255, 255, 0.28);
     --green: #30d158;
+    --amber: #ff9f0a;
     --purple: #bf5af2;
     --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   }
@@ -43,11 +44,11 @@
   .wrap {
     max-width: 680px;
     margin: 0 auto;
-    padding: clamp(28px, 7.5vh, 84px) clamp(16px, 4vw, 28px) 52px;
+    padding: clamp(28px, 7vh, 76px) clamp(16px, 4vw, 28px) 52px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: clamp(20px, 3.6vh, 34px);
+    gap: clamp(18px, 3.2vh, 30px);
   }
 
   .header { text-align: center; }
@@ -66,6 +67,61 @@
     color: var(--dim);
     font-weight: 400;
   }
+
+  .recovery-banner {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(255, 159, 10, 0.1);
+    border: 1px solid rgba(255, 159, 10, 0.25);
+    color: #ffd180;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  /* ---- FIRST-RUN APPLE OBSIDIAN WELCOME WIZARD ---- */
+  .onboard-card {
+    width: 100%;
+    padding: 18px 20px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, #131318 0%, #0d0d11 100%);
+    border: 1px solid rgba(255, 255, 255, 0.13);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 18px 46px rgba(0, 0, 0, 0.6);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .ob-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .ob-title { font-size: 15px; font-weight: 650; color: #fff; }
+  .ob-steps { display: flex; gap: 6px; }
+  .ob-dot { width: 20px; height: 4px; border-radius: 99px; background: rgba(255,255,255,0.14); }
+  .ob-dot.active { background: #fff; }
+  .ob-desc { font-size: 12.5px; color: var(--sec); line-height: 1.45; margin: 0; }
+  .ob-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .ob-opt {
+    padding: 11px 10px; border-radius: 11px; border: 1px solid var(--hairline);
+    background: #14141a; color: var(--sec); cursor: pointer; text-align: left;
+    font-family: inherit; transition: border-color 140ms, background 140ms, color 140ms;
+  }
+  .ob-opt:hover { background: #1a1a22; color: #fff; }
+  .ob-opt.selected { border-color: rgba(255,255,255,0.34); background: #1e1e27; color: #fff; }
+  .ob-opt strong { display: block; font-size: 12.5px; font-weight: 600; color: inherit; }
+  .ob-opt span { display: block; font-size: 11px; color: var(--dim); margin-top: 2px; }
+  .ob-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .ob-btn {
+    height: 32px; padding: 0 14px; border-radius: 9px; border: none;
+    background: rgba(255,255,255,0.09); color: var(--text); font-family: inherit;
+    font-size: 12px; font-weight: 550; cursor: pointer; transition: background 130ms;
+  }
+  .ob-btn:hover { background: rgba(255,255,255,0.16); }
+  .ob-btn.primary { background: #e5e5ea; color: #000; font-weight: 600; }
+  .ob-btn.primary:hover { background: #fff; }
+  .ob-btn.ghost { background: transparent; color: var(--dim); }
+  .ob-btn.ghost:hover { color: var(--text); }
+  .ob-chips { display: flex; flex-wrap: wrap; gap: 7px; }
 
   /* Frosted Apple Search Capsule */
   .search-form {
@@ -89,186 +145,95 @@
     box-shadow: 0 0 0 3px rgba(255,255,255,0.055), 0 20px 48px rgba(0,0,0,0.72);
   }
   .search-form input {
-    flex: 1;
-    min-width: 0;
-    height: 100%;
-    border: none;
-    outline: none;
-    background: transparent;
-    color: var(--text);
-    font-family: inherit;
-    font-size: 14px;
+    flex: 1; min-width: 0; height: 100%; border: none; outline: none; background: transparent;
+    color: var(--text); font-family: inherit; font-size: 14px;
   }
   .search-form input::placeholder { color: var(--dim); }
   .kbd-hint {
-    font-size: 11px;
-    color: var(--dim);
-    padding: 3px 7px;
-    border-radius: 6px;
-    background: rgba(255,255,255,0.05);
-    cursor: pointer;
-    flex-shrink: 0;
+    font-size: 11px; color: var(--dim); padding: 3px 7px; border-radius: 6px;
+    background: rgba(255,255,255,0.05); cursor: pointer; flex-shrink: 0;
     transition: color 120ms, background 120ms;
   }
   .kbd-hint:hover { color: var(--text); background: rgba(255,255,255,0.1); }
 
   /* Apple Safari Squircle Favorites */
   .section { width: 100%; }
-  .sec-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--sec);
-    margin: 0 0 14px;
-    letter-spacing: -0.01em;
-  }
+  .sec-title { font-size: 13px; font-weight: 600; color: var(--sec); margin: 0 0 14px; letter-spacing: -0.01em; }
 
-  .fav-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(78px, 1fr));
-    gap: 16px 12px;
-  }
+  .fav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 16px 12px; }
   .fav-tile {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 7px;
-    text-decoration: none;
-    color: var(--sec);
-    cursor: pointer;
-    min-width: 0;
+    display: flex; flex-direction: column; align-items: center; gap: 7px;
+    text-decoration: none; color: var(--sec); cursor: pointer; min-width: 0;
     transition: color 140ms var(--ease);
   }
   .fav-tile:hover { color: var(--text); }
   .fav-squircle {
-    width: 54px;
-    height: 54px;
-    border-radius: 15px;
-    background: var(--surface);
+    width: 54px; height: 54px; border-radius: 15px; background: var(--surface);
     border: 1px solid var(--hairline);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 6px 18px rgba(0,0,0,0.45);
-    display: grid;
-    place-items: center;
-    font-size: 19px;
-    font-weight: 600;
-    color: rgba(255,255,255,0.84);
-    overflow: hidden;
+    display: grid; place-items: center; font-size: 19px; font-weight: 600;
+    color: rgba(255,255,255,0.84); overflow: hidden;
     transition: transform 160ms var(--ease), background 160ms var(--ease), border-color 160ms var(--ease);
   }
   .fav-squircle img { width: 24px; height: 24px; border-radius: 5px; object-fit: contain; display: block; }
   .fav-tile:hover .fav-squircle {
     transform: translateY(-2px) scale(1.03);
-    background: var(--surface-hover);
-    border-color: var(--hairline-mid);
-    color: #fff;
+    background: var(--surface-hover); border-color: var(--hairline-mid); color: #fff;
   }
   .fav-name {
-    max-width: 100%;
-    font-size: 11.5px;
-    font-weight: 450;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    text-align: center;
+    max-width: 100%; font-size: 11.5px; font-weight: 450; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; text-align: center;
   }
 
-  /* Recently Closed Chips */
-  .closed-strip {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
+  .closed-strip { display: flex; flex-wrap: wrap; gap: 6px; }
   .closed-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    max-width: 210px;
-    height: 28px;
-    padding: 0 10px;
-    border-radius: 999px;
-    border: 1px solid var(--hairline);
-    background: var(--surface);
-    color: var(--sec);
-    font-family: inherit;
-    font-size: 11.5px;
-    cursor: pointer;
-    transition: background 130ms, color 130ms, border-color 130ms;
+    display: inline-flex; align-items: center; gap: 6px; max-width: 210px; height: 28px;
+    padding: 0 10px; border-radius: 999px; border: 1px solid var(--hairline);
+    background: var(--surface); color: var(--sec); font-family: inherit; font-size: 11.5px;
+    cursor: pointer; transition: background 130ms, color 130ms, border-color 130ms;
   }
   .closed-chip:hover { background: var(--surface-hover); border-color: var(--hairline-mid); color: #fff; }
   .closed-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  /* Safari-style Quiet Privacy Report Card */
   .privacy-card {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    padding: 14px 16px;
-    border-radius: 15px;
-    background: var(--surface);
-    border: 1px solid var(--hairline);
-    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
-    cursor: pointer;
+    width: 100%; display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+    border-radius: 15px; background: var(--surface); border: 1px solid var(--hairline);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05); cursor: pointer;
     transition: background 150ms var(--ease), border-color 150ms var(--ease);
   }
   .privacy-card:hover { background: var(--surface-hover); border-color: var(--hairline-mid); }
   .priv-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    background: rgba(48, 209, 88, 0.12);
-    color: var(--green);
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
+    width: 36px; height: 36px; border-radius: 10px; background: rgba(48, 209, 88, 0.12);
+    color: var(--green); display: grid; place-items: center; flex-shrink: 0;
   }
-  body.private-page .priv-icon {
-    background: rgba(191, 90, 242, 0.14);
-    color: var(--purple);
-  }
+  body.private-page .priv-icon { background: rgba(191, 90, 242, 0.14); color: var(--purple); }
   .priv-copy { min-width: 0; flex: 1; }
   .priv-copy strong { display: block; font-size: 13px; font-weight: 550; color: var(--text); }
   .priv-copy span { display: block; font-size: 11.5px; color: var(--sec); margin-top: 2px; line-height: 1.4; }
 
-  /* Subtle borderless recent visits */
   .recent-list { display: flex; flex-direction: column; gap: 2px; }
   .recent-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 8px 10px;
-    border-radius: 9px;
-    color: var(--text);
-    text-decoration: none;
-    cursor: pointer;
-    min-width: 0;
-    transition: background 130ms var(--ease);
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    padding: 8px 10px; border-radius: 9px; color: var(--text); text-decoration: none;
+    cursor: pointer; min-width: 0; transition: background 130ms var(--ease);
   }
   .recent-row:hover { background: rgba(255,255,255,0.055); }
   .recent-title { flex: 1; min-width: 0; font-size: 12.5px; font-weight: 450; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .recent-host { font-size: 11.5px; color: var(--dim); white-space: nowrap; flex-shrink: 0; }
 
-  /* Non-intrusive Bottom-Right Toast matching external pages */
   .nt-toast {
-    position: fixed;
-    right: 16px;
-    bottom: 16px;
-    max-width: min(360px, 76vw);
-    padding: 8px 14px;
-    border-radius: 10px;
-    background: rgba(20, 20, 26, 0.95);
+    position: fixed; right: 16px; bottom: 16px; max-width: min(360px, 76vw);
+    padding: 8px 14px; border-radius: 10px; background: rgba(20, 20, 26, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.16);
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    color: #fff;
-    font-size: 12px;
-    font-weight: 500;
-    opacity: 0;
-    transform: translateY(8px);
-    transition: opacity 160ms ease, transform 160ms ease;
-    pointer-events: none;
-    z-index: 999;
+    color: #fff; font-size: 12px; font-weight: 500; opacity: 0; transform: translateY(8px);
+    transition: opacity 160ms ease, transform 160ms ease; pointer-events: none; z-index: 999;
   }
   .nt-toast.show { opacity: 1; transform: translateY(0); }
+
+  @media (max-width: 520px) {
+    .ob-grid { grid-template-columns: 1fr; }
+  }
 </style>
 </head>
 <body>
@@ -279,11 +244,18 @@
     <p class="subtitle" id="sub">Espacio General</p>
   </div>
 
+  <div class="recovery-banner" id="recovery-banner" style="display:none">
+    <span>Sesión anterior recuperada tras cierre inesperado · Tus pestañas esperan hibernadas para iniciar sin fallos.</span>
+    <button class="ob-btn" id="btn-rec-tasks" style="height:26px;font-size:11px;">Ver monitor</button>
+  </div>
+
+  <div class="onboard-card" id="onboard-card" style="display:none"></div>
+
   <form class="search-form" id="search-form" autocomplete="off">
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.34)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0">
       <circle cx="11" cy="11" r="7.5"/><line x1="20" y1="20" x2="16.4" y2="16.4"/>
     </svg>
-    <input id="q" type="text" autofocus placeholder="Buscar en la web o escribir una dirección" />
+    <input id="q" type="text" autofocus placeholder="Buscar, !yt, !gh, @tabs, o calcular (ej. 15% de 240)" />
     <span class="kbd-hint" id="btn-cmd" title="Abrir Paleta de comandos">Ctrl K</span>
   </form>
 
@@ -318,6 +290,7 @@
 <script>
   const DATA = __FERRUM_NEWTAB_DATA__;
   const send = (p) => { try { window.ipc.postMessage(JSON.stringify(p)); } catch (_) {} };
+  const esc = (s) => String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
   const engineNames = { duckduckgo: 'DuckDuckGo', google: 'Google', brave: 'Brave Search', startpage: 'Startpage', bing: 'Bing' };
   const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (_) { return u; } };
   const originOf = (u) => { try { return new URL(u).origin; } catch (_) { return ''; } };
@@ -332,6 +305,97 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2600);
   };
+
+  if (DATA.recovered_from_crash && !DATA.is_private) {
+    document.getElementById('recovery-banner').style.display = 'flex';
+    document.getElementById('btn-rec-tasks').onclick = () => send({ cmd: 'toggle_panel', panel: 'tasks' });
+  }
+
+  // ---- 3-STEP WELCOME ONBOARDING WIZARD ----
+  let obStep = 1;
+  let chosenLayout = DATA.layout_mode || 'minimal';
+  const obCard = document.getElementById('onboard-card');
+  function renderOnboarding() {
+    if (!DATA.show_onboarding || DATA.is_private) {
+      obCard.style.display = 'none';
+      return;
+    }
+    obCard.style.display = 'flex';
+    const browsers = (DATA.detected_browsers || []).filter(b => b.available);
+    const dots = [1, 2, 3].map(n => `<span class="ob-dot ${n <= obStep ? 'active' : ''}"></span>`).join('');
+    if (obStep === 1) {
+      obCard.innerHTML = `
+        <div class="ob-head">
+          <div class="ob-title">Bienvenido a Ferrum Browser</div>
+          <div class="ob-steps">${dots}</div>
+        </div>
+        <p class="ob-desc">Paso 1 de 3 · Elige el estilo de interfaz que prefieres (puedes cambiarlo en cualquier momento desde Ajustes):</p>
+        <div class="ob-grid">
+          <button class="ob-opt ${chosenLayout === 'minimal' ? 'selected' : ''}" data-ob-lay="minimal"><strong>Minimalista</strong><span>2 filas limpias estilo Safari</span></button>
+          <button class="ob-opt ${chosenLayout === 'compact' ? 'selected' : ''}" data-ob-lay="compact"><strong>Compacto</strong><span>Todo en 1 sola barra</span></button>
+          <button class="ob-opt ${chosenLayout === 'vertical' ? 'selected' : ''}" data-ob-lay="vertical"><strong>Vertical</strong><span>Barra lateral estilo Arc</span></button>
+        </div>
+        <div class="ob-actions">
+          <button class="ob-btn ghost" id="ob-skip">Omitir guía</button>
+          <button class="ob-btn primary" id="ob-next">Siguiente →</button>
+        </div>
+      `;
+      obCard.querySelectorAll('[data-ob-lay]').forEach(btn => {
+        btn.onclick = () => {
+          chosenLayout = btn.dataset.obLay;
+          send({ cmd: 'set_layout_mode', mode: chosenLayout });
+          renderOnboarding();
+        };
+      });
+      document.getElementById('ob-skip').onclick = () => { obCard.style.display = 'none'; send({ cmd: 'complete_onboarding' }); };
+      document.getElementById('ob-next').onclick = () => { obStep = 2; renderOnboarding(); };
+    } else if (obStep === 2) {
+      obCard.innerHTML = `
+        <div class="ob-head">
+          <div class="ob-title">Trae tus marcadores en 1 clic</div>
+          <div class="ob-steps">${dots}</div>
+        </div>
+        <p class="ob-desc">Paso 2 de 3 · Importa tus favoritos existentes desde otros navegadores instalados en este equipo (100% local):</p>
+        <div class="ob-chips">
+          ${browsers.length
+            ? browsers.map(b => `<button class="ob-btn" data-ob-imp="${esc(b.id)}">Importar de ${esc(b.name)}</button>`).join('')
+            : '<span class="ob-desc">No se detectaron perfiles Chromium automáticamente; también puedes importar CSV desde la Bóveda.</span>'}
+        </div>
+        <div class="ob-actions">
+          <button class="ob-btn ghost" id="ob-prev">← Atrás</button>
+          <button class="ob-btn primary" id="ob-next">Siguiente →</button>
+        </div>
+      `;
+      obCard.querySelectorAll('[data-ob-imp]').forEach(btn => {
+        btn.onclick = () => { send({ cmd: 'import_bookmarks', browser_id: btn.dataset.obImp }); btn.textContent = 'Importado ✓'; };
+      });
+      document.getElementById('ob-prev').onclick = () => { obStep = 1; renderOnboarding(); };
+      document.getElementById('ob-next').onclick = () => { obStep = 3; renderOnboarding(); };
+    } else {
+      obCard.innerHTML = `
+        <div class="ob-head">
+          <div class="ob-title">Listo para el día a día</div>
+          <div class="ob-steps">${dots}</div>
+        </div>
+        <p class="ob-desc">Paso 3 de 3 · Tu Escudo de privacidad (HTTPS-Only + anti-rastreo) ya está activo. Opcionalmente integra Ferrum con Windows:</p>
+        <div class="ob-chips">
+          <button class="ob-btn" id="ob-reg">${DATA.windows_registered ? 'Registrado en Windows ✓' : 'Navegador predeterminado'}</button>
+          <button class="ob-btn" id="ob-sc">Crear accesos directos</button>
+          <button class="ob-btn" id="ob-vault">Abrir Bóveda local</button>
+        </div>
+        <div class="ob-actions">
+          <button class="ob-btn ghost" id="ob-prev">← Atrás</button>
+          <button class="ob-btn primary" id="ob-done">¡Empezar a navegar!</button>
+        </div>
+      `;
+      document.getElementById('ob-reg').onclick = (e) => { send({ cmd: 'register_default_browser' }); e.target.textContent = 'Registrado ✓'; };
+      document.getElementById('ob-sc').onclick = (e) => { send({ cmd: 'create_windows_shortcuts' }); e.target.textContent = 'Accesos creados ✓'; };
+      document.getElementById('ob-vault').onclick = () => send({ cmd: 'toggle_panel', panel: 'vault' });
+      document.getElementById('ob-prev').onclick = () => { obStep = 2; renderOnboarding(); };
+      document.getElementById('ob-done').onclick = () => { obCard.style.display = 'none'; send({ cmd: 'complete_onboarding' }); };
+    }
+  }
+  renderOnboarding();
 
   if (DATA.is_private) {
     document.body.classList.add('private-page');

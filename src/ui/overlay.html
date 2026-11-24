@@ -24,6 +24,13 @@
     gap: 2px;
     background: #0d0d11;
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.05);
+    overflow-y: auto;
+  }
+  .drop.site-card {
+    padding: 12px;
+    gap: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.13);
+    border-radius: 12px;
   }
   .row {
     height: 36px;
@@ -33,32 +40,90 @@
     align-items: center;
     gap: 10px;
     cursor: pointer;
+    flex-shrink: 0;
     transition: background 100ms ease;
   }
-  .row:hover, .row.selected {
-    background: rgba(255, 255, 255, 0.09);
-  }
+  .row:hover, .row.selected { background: rgba(255, 255, 255, 0.09); }
   .ic {
-    width: 18px;
-    height: 18px;
-    display: grid;
-    place-items: center;
-    color: rgba(255, 255, 255, 0.45);
-    flex-shrink: 0;
+    width: 18px; height: 18px; display: grid; place-items: center;
+    color: rgba(255, 255, 255, 0.45); flex-shrink: 0;
   }
   .row.selected .ic { color: rgba(255, 255, 255, 0.9); }
+  .ic.calc { color: #30d158; }
+  .ic.bang { color: #bf5af2; }
   .main { flex: 1; min-width: 0; }
   .t { font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .t.calc { color: #7ee797; font-weight: 600; font-variant-numeric: tabular-nums; }
   .s { font-size: 11px; color: rgba(255, 255, 255, 0.44); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pill {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 2px 7px;
-    border-radius: 999px;
-    background: rgba(100, 210, 255, 0.16);
-    color: #90e0ff;
-    flex-shrink: 0;
+    font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 999px;
+    background: rgba(100, 210, 255, 0.16); color: #90e0ff; flex-shrink: 0;
   }
+  .pill.calc { background: rgba(48, 209, 88, 0.16); color: #7ee797; }
+  .pill.bang { background: rgba(191, 90, 242, 0.18); color: #e4b5ff; }
+
+  /* ---- QUICK SITE SHIELD & PERMISSIONS POPOVER ---- */
+  .si-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .si-host-wrap { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+  .si-lock {
+    width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0;
+    background: rgba(48, 209, 88, 0.14); color: #30d158;
+  }
+  .si-lock.warn { background: rgba(255, 159, 10, 0.15); color: #ff9f0a; }
+  .si-lock.priv { background: rgba(191, 90, 242, 0.16); color: #bf5af2; }
+  .si-host { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .si-sub { font-size: 11px; color: rgba(255,255,255,0.48); margin-top: 1px; }
+  .si-x {
+    width: 24px; height: 24px; border: none; border-radius: 7px; background: transparent;
+    color: rgba(255,255,255,0.5); display: grid; place-items: center; cursor: pointer; flex-shrink: 0;
+  }
+  .si-x:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+  .si-box {
+    background: #141419; border-radius: 10px; border: 1px solid rgba(255,255,255,0.06);
+    overflow: hidden; flex-shrink: 0;
+  }
+  .si-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 10px; position: relative;
+  }
+  .si-row + .si-row::before {
+    content: ""; position: absolute; left: 10px; right: 0; top: 0; height: 1px;
+    background: rgba(255,255,255,0.055);
+  }
+  .si-lbl { font-size: 12px; font-weight: 500; }
+  .si-desc { font-size: 10.5px; color: rgba(255,255,255,0.46); }
+
+  .sw {
+    position: relative; width: 34px; height: 19px; border-radius: 999px;
+    background: rgba(255,255,255,0.16); border: none; cursor: pointer; flex-shrink: 0;
+    transition: background 160ms;
+  }
+  .sw::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px;
+    border-radius: 50%; background: #fff; transition: transform 160ms;
+  }
+  .sw.on { background: #30d158; }
+  .sw.on::after { transform: translateX(15px); }
+
+  .si-tools { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .si-btn {
+    height: 26px; padding: 0 9px; border: none; border-radius: 7px;
+    background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.9);
+    font-family: inherit; font-size: 11px; font-weight: 550; cursor: pointer;
+    transition: background 120ms;
+  }
+  .si-btn:hover { background: rgba(255,255,255,0.15); }
+  .si-btn.active { background: #e5e5ea; color: #000; }
+  .si-btn.danger { background: rgba(255,69,58,0.16); color: #ff8a80; }
+  .si-btn.danger:hover { background: rgba(255,69,58,0.26); }
+
+  select.si-sel {
+    background: #1b1b22; color: rgba(255,255,255,0.9); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 7px; padding: 3px 6px; font-family: inherit; font-size: 11px; outline: none;
+  }
+  .si-foot { display: flex; gap: 6px; flex-shrink: 0; }
+  .si-foot .si-btn { flex: 1; height: 28px; }
 </style>
 </head>
 <body>
@@ -66,7 +131,11 @@
 <script>
   const send = (p) => { try { window.ipc.postMessage(JSON.stringify(p)); } catch (_) {} };
   const listEl = document.getElementById('list');
+  const esc = (s) => String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
   const ICONS = {
+    calc: '<svg width="13.5" height="13.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><line x1="5" y1="9" x2="19" y2="9"/><line x1="5" y1="15" x2="19" y2="15"/></svg>',
+    bang: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
     switch_tab: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="3"/><polyline points="10 9 14 12 10 15"/></svg>',
     bookmark: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffd60a" stroke-width="1.8" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>',
     history: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>',
@@ -74,19 +143,107 @@
     navigate: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/></svg>',
   };
 
+  function renderSiteInfo(si) {
+    listEl.className = 'drop site-card';
+    const permOpts = (v) => `
+      <option value="deny" ${v === 'deny' ? 'selected' : ''}>Bloquear</option>
+      <option value="ask" ${v === 'ask' ? 'selected' : ''}>Preguntar</option>
+      <option value="allow" ${v === 'allow' ? 'selected' : ''}>Permitir</option>
+    `;
+    const shieldOn = si.shield_enabled && !si.site_allowlisted;
+    const lockCls = si.is_private ? 'priv' : (si.is_https ? '' : 'warn');
+    const lockSvg = si.is_https
+      ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="11" width="16" height="10" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>'
+      : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+
+    listEl.innerHTML = `
+      <div class="si-head">
+        <div class="si-host-wrap">
+          <div class="si-lock ${lockCls}">${lockSvg}</div>
+          <div class="main">
+            <div class="si-host">${esc(si.host)}</div>
+            <div class="si-sub">${si.is_https ? 'Conexión HTTPS cifrada' : 'Conexión sin cifrado HTTPS'}${si.is_private ? ' · Privada' : ''}</div>
+          </div>
+        </div>
+        <button class="si-x" id="si-close" title="Cerrar (Esc)">
+          <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><line x1="2" y1="2" x2="10" y2="10"/><line x1="10" y1="2" x2="2" y2="10"/></svg>
+        </button>
+      </div>
+
+      <div class="si-box">
+        <div class="si-row">
+          <div class="main">
+            <div class="si-lbl">Escudo en este sitio</div>
+            <div class="si-desc">${shieldOn ? `${si.tab_blocked} rastreadores bloqueados aquí` : 'Escudo pausado en este dominio'}</div>
+          </div>
+          <button class="sw ${shieldOn ? 'on' : ''}" id="si-shield"></button>
+        </div>
+        <div class="si-row">
+          <div class="si-lbl">Vista y zoom</div>
+          <div class="si-tools">
+            <button class="si-btn" id="si-zout" title="Alejar">−</button>
+            <button class="si-btn" id="si-zres" title="Restablecer">${si.zoom_percent}%</button>
+            <button class="si-btn" id="si-zin" title="Acercar">+</button>
+            <button class="si-btn ${si.reader_active ? 'active' : ''}" id="si-reader" title="Modo Lectura">Aa</button>
+            <button class="si-btn ${si.force_dark_active ? 'active' : ''}" id="si-dark" title="Modo Oscuro OLED">☾</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="si-box">
+        <div class="si-row"><span class="si-lbl">Notificaciones</span><select class="si-sel" data-p="notifications">${permOpts(si.permissions.notifications)}</select></div>
+        <div class="si-row"><span class="si-lbl">Ubicación</span><select class="si-sel" data-p="geolocation">${permOpts(si.permissions.geolocation)}</select></div>
+        <div class="si-row"><span class="si-lbl">Cámara y micrófono</span><select class="si-sel" data-p="camera_mic">${permOpts(si.permissions.camera_mic)}</select></div>
+        <div class="si-row"><span class="si-lbl">Portapapeles</span><select class="si-sel" data-p="clipboard">${permOpts(si.permissions.clipboard)}</select></div>
+      </div>
+
+      <div class="si-foot">
+        <button class="si-btn danger" id="si-cookies">Borrar cookies</button>
+        <button class="si-btn" id="si-full">Escudo completo →</button>
+      </div>
+    `;
+
+    document.getElementById('si-close').onclick = () => send({ cmd: 'close_overlay' });
+    document.getElementById('si-shield').onclick = () => {
+      if (!si.shield_enabled) send({ cmd: 'toggle_shield_global' });
+      else send({ cmd: 'toggle_site_allowlist', host: si.host });
+    };
+    document.getElementById('si-zout').onclick = () => send({ cmd: 'zoom_out' });
+    document.getElementById('si-zres').onclick = () => send({ cmd: 'zoom_reset' });
+    document.getElementById('si-zin').onclick = () => send({ cmd: 'zoom_in' });
+    document.getElementById('si-reader').onclick = () => send({ cmd: 'toggle_reader_mode' });
+    document.getElementById('si-dark').onclick = () => send({ cmd: 'toggle_force_dark' });
+    listEl.querySelectorAll('[data-p]').forEach(sel => {
+      sel.onchange = () => send({ cmd: 'set_permission', kind: sel.dataset.p, mode: sel.value });
+    });
+    document.getElementById('si-cookies').onclick = () => {
+      send({ cmd: 'clear_current_site_cookies' });
+      send({ cmd: 'close_overlay' });
+    };
+    document.getElementById('si-full').onclick = () => {
+      send({ cmd: 'close_overlay' });
+      send({ cmd: 'toggle_panel', panel: 'shield' });
+    };
+  }
+
   window.__ferrumUpdateOverlay = function(data) {
+    if (data.mode === 'site_info' && data.site_info) {
+      renderSiteInfo(data.site_info);
+      return;
+    }
+    listEl.className = 'drop';
     listEl.innerHTML = '';
     const items = data.suggestions || [];
     items.forEach((item, idx) => {
       const row = document.createElement('div');
       row.className = 'row' + (idx === data.selected_index ? ' selected' : '');
       const ic = document.createElement('span');
-      ic.className = 'ic';
+      ic.className = 'ic ' + (item.kind || '');
       ic.innerHTML = ICONS[item.kind] || ICONS.search;
       const main = document.createElement('div');
       main.className = 'main';
       const t = document.createElement('div');
-      t.className = 't';
+      t.className = 't' + (item.kind === 'calc' ? ' calc' : '');
       t.textContent = item.title;
       const s = document.createElement('div');
       s.className = 's';
@@ -95,10 +252,11 @@
       main.appendChild(s);
       row.appendChild(ic);
       row.appendChild(main);
-      if (item.kind === 'switch_tab') {
+      const badgeText = item.badge || (item.kind === 'switch_tab' ? 'Cambiar' : '');
+      if (badgeText) {
         const pill = document.createElement('span');
-        pill.className = 'pill';
-        pill.textContent = 'Cambiar';
+        pill.className = 'pill ' + (item.kind || '');
+        pill.textContent = badgeText;
         row.appendChild(pill);
       }
       row.addEventListener('mousedown', (e) => {
@@ -108,6 +266,10 @@
       listEl.appendChild(row);
     });
   };
+
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') send({ cmd: 'close_overlay' });
+  });
 </script>
 </body>
 </html>

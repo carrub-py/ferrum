@@ -244,6 +244,9 @@
       <button class="rbtn" data-tab="shield" title="Escudo y EasyList">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"><path d="M12 2L4 5v6.09c0 5.05 3.41 9.76 8 10.91 4.59-1.15 8-5.86 8-10.91V5l-8-3z"/></svg>
       </button>
+      <button class="rbtn" data-tab="tasks" title="Monitor de pestañas y RAM (Shift+Esc)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </button>
       <button class="rbtn" data-tab="vault" title="Bóveda de contraseñas">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2.5"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
       </button>
@@ -332,6 +335,10 @@
       { label: 'Nueva pestaña', kbd: 'Ctrl+T', run: () => send({ cmd: 'new_tab', url: null, private: false }) },
       { label: 'Nueva ventana independiente', kbd: 'Ctrl+N', run: () => send({ cmd: 'new_window', url: null }) },
       { label: 'Nueva pestaña privada (Incógnito)', kbd: 'Ctrl+Shift+N', run: () => send({ cmd: 'new_tab', url: null, private: true }) },
+      { label: 'Monitor de pestañas y memoria RAM', kbd: 'Shift+Esc', run: () => send({ cmd: 'toggle_panel', panel: 'tasks' }) },
+      { label: 'Hibernar todas las pestañas inactivas (liberar RAM)', kbd: '', run: () => send({ cmd: 'hibernate_all_inactive' }) },
+      { label: 'Agrupar pestaña actual en un nuevo grupo', kbd: '', run: () => send({ cmd: 'create_tab_group', tab_id: s.active_tab_id, name: '', color: '#64d2ff' }) },
+      { label: 'Mover pestaña actual a nueva ventana', kbd: 'Ctrl+Shift+M', run: () => send({ cmd: 'move_tab_to_new_window', id: s.active_tab_id }) },
       { label: 'Bloquear elemento visual (Selector Escudo)', kbd: 'Alt+E', run: () => send({ cmd: 'start_element_picker' }) },
       { label: 'Autocompletar contraseña del sitio', kbd: 'Ctrl+Shift+L', run: () => send({ cmd: 'quick_autofill' }) },
       { label: 'Buscar actualizaciones de Ferrum (GitHub)', kbd: '', run: () => send({ cmd: 'check_for_updates' }) },
@@ -537,6 +544,69 @@
     document.getElementById('in-block').onkeydown = (e) => { if (e.key === 'Enter') addB(); };
     bodyEl.querySelectorAll('[data-rm-b]').forEach(b => b.onclick = () => send({ cmd: 'remove_custom_block_domain', domain: b.dataset.rmB }));
     bodyEl.querySelectorAll('[data-rm-a]').forEach(b => b.onclick = () => send({ cmd: 'remove_allowlist_domain', domain: b.dataset.rmA }));
+  }
+
+  function renderTasks(s) {
+    const mem = s.memory || { main_process_mb: 0, webview_processes_mb: 0, total_mb: 0, process_count: 1 };
+    const awakeCount = s.tabs.filter(t => !t.is_hibernated).length;
+    const hibCount = s.tabs.filter(t => t.is_hibernated).length;
+    const wsMap = new Map((s.workspaces || []).map(w => [w.id, w]));
+    const grpMap = new Map((s.tab_groups || []).map(g => [g.id, g]));
+
+    bodyEl.innerHTML = `
+      <div class="page-head">
+        <h2 class="page-title">Monitor</h2>
+        <button class="head-link" id="tm-ref">Actualizar</button>
+      </div>
+
+      <div class="metrics">
+        <div class="metric"><div class="m-val green">${mem.total_mb.toFixed(0)} MB</div><div class="m-lbl">RAM total</div></div>
+        <div class="metric"><div class="m-val">${mem.webview_processes_mb.toFixed(0)} MB</div><div class="m-lbl">WebView2 (${mem.process_count})</div></div>
+        <div class="metric"><div class="m-val">${awakeCount} / ${hibCount}</div><div class="m-lbl">Activas / Dormidas</div></div>
+      </div>
+
+      <div class="hstack wrap">
+        <button class="btn primary" style="flex:1" id="tm-hib-all">Hibernar todas las inactivas</button>
+        <button class="btn" id="tm-new-grp" title="Agrupar pestaña actual">+ Grupo</button>
+      </div>
+
+      <div class="sec-lbl"><span>Pestañas abiertas</span><span>${s.tabs.length}</span></div>
+      <div class="group">
+        ${s.tabs.map(t => {
+          const isAct = t.id === s.active_tab_id;
+          const isSplit = t.id === s.split_tab_id;
+          const ws = wsMap.get(t.workspace_id);
+          const grp = t.group_id ? grpMap.get(t.group_id) : null;
+          const stTag = isAct ? '<span class="tag ok">Activa</span>'
+            : (t.is_hibernated ? '<span class="tag Custom">Dormida</span>'
+            : (t.is_playing_audio ? '<span class="tag Analytics">Audio</span>' : '<span class="tag Tracker">En RAM</span>'));
+          const subBits = [];
+          if (ws) subBits.push(ws.name);
+          if (grp) subBits.push('Grupo: ' + grp.name);
+          if (t.host) subBits.push(t.host);
+          if (t.blocked_count > 0) subBits.push(`${t.blocked_count} bloq.`);
+          return `
+            <div class="g-row clickable ${isAct ? 'selected' : ''}" data-tsw="${t.id}">
+              <span class="ws-dot" style="background:${grp ? grp.color : (ws?.accent || '#a1a1aa')}"></span>
+              <div class="row-main">
+                <div class="row-title">${esc(t.title || 'Nueva pestaña')}</div>
+                <div class="row-sub">${esc(subBits.join(' · ') || t.display_url)}</div>
+              </div>
+              ${stTag}
+              ${!isAct && !isSplit && !t.is_hibernated ? `<button class="act" data-thib="${t.id}" title="Hibernar pestaña">${IC_SLEEP}</button>` : ''}
+              <button class="act del" data-tcls="${t.id}" title="Cerrar pestaña">${IC_X}</button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `;
+
+    document.getElementById('tm-ref').onclick = () => send({ cmd: 'refresh_memory_stats' });
+    document.getElementById('tm-hib-all').onclick = () => send({ cmd: 'hibernate_all_inactive' });
+    document.getElementById('tm-new-grp').onclick = () => send({ cmd: 'create_tab_group', tab_id: s.active_tab_id, name: '', color: '#64d2ff' });
+    bodyEl.querySelectorAll('[data-tsw]').forEach(el => el.onclick = () => send({ cmd: 'switch_tab', id: Number(el.dataset.tsw) }));
+    bodyEl.querySelectorAll('[data-thib]').forEach(b => b.onclick = (e) => { e.stopPropagation(); send({ cmd: 'hibernate_tab', id: Number(b.dataset.thib) }); });
+    bodyEl.querySelectorAll('[data-tcls]').forEach(b => b.onclick = (e) => { e.stopPropagation(); send({ cmd: 'close_tab', id: Number(b.dataset.tcls) }); });
   }
 
   function renderVault(s) {
@@ -1028,14 +1098,14 @@
     bodyEl.innerHTML = `
       <div class="page-head">
         <h2 class="page-title">Ajustes</h2>
-        <span class="tag Custom">v${esc(s.updater?.current_version || '0.5.0')}</span>
+        <span class="tag Custom">v${esc(s.updater?.current_version || '0.6.0')}</span>
       </div>
 
       <div class="sec-lbl"><span>Actualizaciones automáticas (GitHub)</span></div>
       <div class="group group-pad vstack">
         <div class="hstack" style="justify-content:space-between;">
           <div class="row-main">
-            <div class="row-title">Ferrum Browser v${esc(s.updater?.current_version || '0.5.0')}</div>
+            <div class="row-title">Ferrum Browser v${esc(s.updater?.current_version || '0.6.0')}</div>
             <div class="row-sub wrap">${esc(s.updater?.status_text || 'Verificación automática con firma SHA-256 desde GitHub Releases.')}</div>
           </div>
           ${s.updater?.available ? `<span class="tag ok">v${esc(s.updater.available.version)}</span>` : ''}
@@ -1066,6 +1136,24 @@
       <div class="sec-lbl"><span>Buscador predeterminado</span></div>
       <div class="grid2">
         ${engines.map(e => `<button class="opt-card ${s.search_engine === e.id ? 'selected' : ''}" data-eng="${e.id}"><div>${e.name}</div><div style="font-size:10.5px;color:var(--sec);margin-top:2px;font-weight:400;">${e.desc}</div></button>`).join('')}
+      </div>
+
+      <div class="sec-lbl"><span>Atajos de búsqueda (!bangs) y Omnibox</span></div>
+      <div class="group group-pad vstack">
+        <div class="row-sub wrap">
+          Incluidos: <code>!yt</code> <code>!gh</code> <code>!w</code> <code>!mdn</code> <code>!rs</code> <code>!npm</code> <code>!tr</code> <code>!r</code> · Filtros: <code>@tabs</code> <code>@bm</code> <code>@hist</code> · Calculadora y unidades: <code>15% de 240</code>, <code>100 km a mi</code>.
+        </div>
+        <div class="hstack">
+          <input type="text" id="cse-kw" placeholder="Atajo (ej. py)" style="max-width:94px;" />
+          <input type="text" id="cse-nm" placeholder="Nombre (ej. PyPI)" />
+        </div>
+        <div class="hstack">
+          <input type="text" id="cse-url" placeholder="https://pypi.org/search/?q=%s" />
+          <button class="btn primary sm" id="cse-add">Añadir</button>
+        </div>
+        ${(s.custom_search_engines || []).length ? `
+          <div class="chips">${s.custom_search_engines.map(c => `<span class="chip" title="${esc(c.url_template)}"><span class="chip-txt">!${esc(c.keyword)} · ${esc(c.name)}</span><button data-rm-cse="${esc(c.keyword)}">×</button></span>`).join('')}</div>
+        ` : ''}
       </div>
 
       <div class="sec-lbl"><span>Rendimiento e interfaz</span></div>
@@ -1127,16 +1215,40 @@
         <button class="btn" style="width:100%" id="btn-bkp-imp">Importar respaldo seleccionado</button>
       </div>
 
-      <div class="sec-lbl"><span>Privacidad</span></div>
-      <div class="group group-pad">
-        <div class="row-sub wrap" style="margin-bottom:10px;">Borra cookies, caché del motor WebView2, historial y registro de descargas.</div>
+      <div class="sec-lbl"><span>Sincronización E2EE en la nube (GitHub Gist privado)</span></div>
+      <div class="group group-pad vstack">
+        <div class="hstack" style="justify-content:space-between;">
+          <div class="row-main">
+            <div class="row-title">Zero-Knowledge Sync sin servidor propio</div>
+            <div class="row-sub wrap">${esc(s.sync?.status_text || (s.sync?.last_sync ? 'Última sync: ' + fmtTime(s.sync.last_sync) : 'Cifra tus datos en tu equipo (Argon2id + AES-256-GCM) antes de subir al Gist privado. Token protegido con Windows DPAPI.'))}</div>
+          </div>
+          ${s.sync?.has_token ? '<span class="tag ok">DPAPI</span>' : ''}
+        </div>
+        <input type="password" id="gist-tok" placeholder="${s.sync?.has_token ? 'Token guardado con DPAPI (escribe para reemplazar)' : 'GitHub Personal Access Token (permiso gist)...'}" />
+        <div class="hstack">
+          <input type="text" id="gist-id" placeholder="ID del Gist (vacío = crear uno privado al subir)" value="${esc(s.sync?.gist_id || '')}" />
+          <button class="btn sm" id="btn-gist-save">Guardar</button>
+        </div>
+        <input type="password" id="gist-pass" placeholder="Clave maestra de cifrado E2EE (mín. 6 caracteres)..." />
+        <div class="hstack wrap">
+          <button class="btn primary" style="flex:1" id="btn-gist-push" ${s.sync?.busy ? 'disabled' : ''}>${s.sync?.busy ? 'Sincronizando...' : 'Subir cifrado (Push)'}</button>
+          <button class="btn" style="flex:1" id="btn-gist-pull" ${s.sync?.busy ? 'disabled' : ''}>Descargar (Pull)</button>
+        </div>
+        ${s.sync?.has_token ? '<button class="btn sm danger" id="btn-gist-clr">Desconectar y borrar token DPAPI</button>' : ''}
+      </div>
+
+      <div class="sec-lbl"><span>Privacidad y estabilidad</span></div>
+      <div class="group group-pad vstack">
+        <div class="row-sub wrap">Borra cookies, caché del motor WebView2, historial y registro de descargas.${s.crash_reports_count ? ` (${s.crash_reports_count} reportes locales en crashes/)` : ''}</div>
         <button class="btn danger" style="width:100%" id="btn-wipe">${confirmClearAll ? 'Confirmar limpieza completa' : 'Limpiar datos de navegación'}</button>
       </div>
 
       <div class="sec-lbl"><span>Atajos esenciales</span></div>
       <div class="group">
         <div class="g-row"><div class="row-main"><div class="row-title">Paleta de comandos</div></div><kbd>Ctrl+K</kbd></div>
-        <div class="g-row"><div class="row-main"><div class="row-title">Nueva ventana independiente</div></div><kbd>Ctrl+N</kbd></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Monitor de pestañas y RAM</div></div><kbd>Shift+Esc</kbd></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Cambiar de Espacio rápido</div></div><kbd>Ctrl+Alt+1..9</kbd></div>
+        <div class="g-row"><div class="row-main"><div class="row-title">Nueva ventana / Mover pestaña</div></div><kbd>Ctrl+N / Shift+M</kbd></div>
         <div class="g-row"><div class="row-main"><div class="row-title">Vista Dividida</div></div><kbd>Ctrl+\\</kbd></div>
         <div class="g-row"><div class="row-main"><div class="row-title">Autocompletar contraseña</div></div><kbd>Ctrl+Shift+L</kbd></div>
         <div class="g-row"><div class="row-main"><div class="row-title">Selector visual de elementos</div></div><kbd>Alt+E</kbd></div>
@@ -1181,6 +1293,27 @@
       const pass = document.getElementById('bkp-pass').value;
       send({ cmd: 'import_encrypted_backup', path: p, passphrase: pass });
     };
+    document.getElementById('cse-add').onclick = () => {
+      const keyword = document.getElementById('cse-kw').value.trim();
+      const name = document.getElementById('cse-nm').value.trim();
+      const url_template = document.getElementById('cse-url').value.trim();
+      if (keyword && url_template) send({ cmd: 'add_custom_search_engine', keyword, name, url_template });
+    };
+    bodyEl.querySelectorAll('[data-rm-cse]').forEach(b => b.onclick = () => send({ cmd: 'remove_custom_search_engine', keyword: b.dataset.rmCse }));
+    document.getElementById('btn-gist-save').onclick = () => {
+      const token = document.getElementById('gist-tok').value.trim();
+      const gist_id = document.getElementById('gist-id').value.trim();
+      send({ cmd: 'save_gist_sync_config', token, gist_id });
+    };
+    document.getElementById('btn-gist-push').onclick = () => {
+      const passphrase = document.getElementById('gist-pass').value;
+      send({ cmd: 'sync_gist_push', passphrase });
+    };
+    document.getElementById('btn-gist-pull').onclick = () => {
+      const passphrase = document.getElementById('gist-pass').value;
+      send({ cmd: 'sync_gist_pull', passphrase });
+    };
+    document.getElementById('btn-gist-clr')?.addEventListener('click', () => send({ cmd: 'clear_gist_sync_config' }));
     document.getElementById('btn-wipe').onclick = () => {
       if (!confirmClearAll) { confirmClearAll = true; render(); }
       else { confirmClearAll = false; send({ cmd: 'clear_all_browsing_data' }); }
@@ -1251,6 +1384,13 @@
       s.updater?.installing ? '1' : '0',
       s.updater?.available?.version || '',
       s.updater?.status_text || '',
+      s.tab_groups?.length || 0,
+      s.custom_search_engines?.length || 0,
+      s.memory?.total_mb || 0,
+      s.sync?.has_token ? '1' : '0',
+      s.sync?.busy ? '1' : '0',
+      s.sync?.gist_id || '',
+      s.sync?.status_text || '',
     ].join('|');
   }
 
@@ -1267,6 +1407,7 @@
     switch (state.open_panel) {
       case 'commands': renderCommands(state); break;
       case 'shield': renderShield(state); break;
+      case 'tasks': renderTasks(state); break;
       case 'vault': renderVault(state); break;
       case 'extensions': renderExtensions(state); break;
       case 'workspaces': renderWorkspaces(state); break;

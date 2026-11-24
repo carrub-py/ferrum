@@ -30,22 +30,23 @@ struct EncryptedBackupFile {
     ciphertext_b64: String,
 }
 
-/// Exports all Ferrum user data (bookmarks, settings, notes, userscripts, encrypted vault)
-/// into a single Argon2id + AES-256-GCM encrypted `.ferrum-backup` file.
-pub fn export_encrypted_backup(
-    data_dir: &Path,
-    target_path: &Path,
-    passphrase: &str,
-) -> Result<PathBuf, String> {
+/// Serializes and encrypts Ferrum user data (bookmarks, settings, notes, userscripts, vault)
+/// into an Argon2id + AES-256-GCM JSON string. Strips machine-local DPAPI sync tokens
+/// before encrypting so machine-bound blobs never overwrite another PC's credentials.
+pub fn create_encrypted_backup_json(data_dir: &Path, passphrase: &str) -> Result<String, String> {
     if passphrase.chars().count() < 6 {
         return Err("Usa una clave de al menos 6 caracteres para cifrar el respaldo.".into());
     }
+
+    let settings_json = fs::read_to_string(data_dir.join("settings.json"))
+        .ok()
+        .map(|raw| strip_local_sync_secrets(&raw));
 
     let bundle = BackupBundle {
         version: 1,
         created_at: unix_now(),
         bookmarks_json: fs::read_to_string(data_dir.join("bookmarks.json")).ok(),
-        settings_json: fs::read_to_string(data_dir.join("settings.json")).ok(),
+        settings_json,
         notes_json: fs::read_to_string(data_dir.join("notes.json")).ok(),
         userscripts_json: fs::read_to_string(data_dir.join("userscripts.json")).ok(),
         vault_enc: fs::read_to_string(data_dir.join("vault.enc")).ok(),
@@ -72,32 +73,33 @@ pub fn export_encrypted_backup(
         ciphertext_b64: B64.encode(ciphertext),
     };
 
+    serde_json::to_string_pretty(&envelope).map_err(|e| format!("Error serializando respaldo: {e}"))
+}
+
+/// Exports all Ferrum user data (bookmarks, settings, notes, userscripts, encrypted vault)
+/// into a single Argon2id + AES-256-GCM encrypted `.ferrum-backup` file.
+pub fn export_encrypted_backup(
+    data_dir: &Path,
+    target_path: &Path,
+    passphrase: &str,
+) -> Result<PathBuf, String> {
+    let json = create_encrypted_backup_json(data_dir, passphrase)?;
     if let Some(parent) = target_path.parent() {
         let _ = fs::create_dir_all(parent);
     }
-    let json = serde_json::to_string_pretty(&envelope)
-        .map_err(|e| format!("Error serializando respaldo: {e}"))?;
     fs::write(target_path, json).map_err(|e| format!("No se pudo escribir el archivo: {e}"))?;
     Ok(target_path.to_path_buf())
 }
 
-/// Decrypts and restores a `.ferrum-backup` file into `data_dir`.
-pub fn import_encrypted_backup(
+/// Decrypts an encrypted backup JSON payload and restores it into `data_dir`,
+/// preserving the local machine's DPAPI Gist sync token if present.
+pub fn restore_encrypted_backup_json(
     data_dir: &Path,
-    source_path: &Path,
+    raw: &str,
     passphrase: &str,
 ) -> Result<usize, String> {
-    if !source_path.exists() {
-        return Err(format!(
-            "No se encontró el archivo de respaldo: {}",
-            source_path.display()
-        ));
-    }
-
-    let raw =
-        fs::read_to_string(source_path).map_err(|e| format!("No se pudo leer el respaldo: {e}"))?;
     let env: EncryptedBackupFile =
-        serde_json::from_str(&raw).map_err(|_| "Archivo de respaldo inválido.".to_string())?;
+        serde_json::from_str(raw).map_err(|_| "Archivo de respaldo inválido.".to_string())?;
     if env.magic != "FERRUM_BACKUP_V1" {
         return Err("Formato de respaldo no reconocido.".into());
     }
@@ -125,11 +127,19 @@ pub fn import_encrypted_backup(
     let bundle: BackupBundle = serde_json::from_slice(&plaintext)
         .map_err(|_| "Contenido de respaldo dañado.".to_string())?;
 
+    // Preserve local machine-bound DPAPI Gist token & ID if settings are restored
+    let existing_local_sync = fs::read_to_string(data_dir.join("settings.json"))
+        .ok()
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok());
+
     let _ = fs::create_dir_all(data_dir);
     let mut restored = 0usize;
+    let restored_settings = bundle
+        .settings_json
+        .map(|body| merge_local_sync_secrets(&body, existing_local_sync.as_ref()));
     let items = [
         ("bookmarks.json", bundle.bookmarks_json),
-        ("settings.json", bundle.settings_json),
+        ("settings.json", restored_settings),
         ("notes.json", bundle.notes_json),
         ("userscripts.json", bundle.userscripts_json),
         ("vault.enc", bundle.vault_enc),
@@ -142,6 +152,56 @@ pub fn import_encrypted_backup(
         }
     }
     Ok(restored)
+}
+
+/// Decrypts and restores a `.ferrum-backup` file into `data_dir`.
+pub fn import_encrypted_backup(
+    data_dir: &Path,
+    source_path: &Path,
+    passphrase: &str,
+) -> Result<usize, String> {
+    if !source_path.exists() {
+        return Err(format!(
+            "No se encontró el archivo de respaldo: {}",
+            source_path.display()
+        ));
+    }
+
+    let raw =
+        fs::read_to_string(source_path).map_err(|e| format!("No se pudo leer el respaldo: {e}"))?;
+    restore_encrypted_backup_json(data_dir, &raw, passphrase)
+}
+
+fn strip_local_sync_secrets(settings_raw: &str) -> String {
+    let Ok(mut val) = serde_json::from_str::<serde_json::Value>(settings_raw) else {
+        return settings_raw.to_string();
+    };
+    if let Some(obj) = val.as_object_mut() {
+        obj.remove("gist_token_dpapi");
+        obj.remove("gist_sync_id");
+        obj.remove("gist_last_sync");
+    }
+    serde_json::to_string_pretty(&val).unwrap_or_else(|_| settings_raw.to_string())
+}
+
+fn merge_local_sync_secrets(
+    incoming_raw: &str,
+    existing_local: Option<&serde_json::Value>,
+) -> String {
+    let Some(local_obj) = existing_local.and_then(|v| v.as_object()) else {
+        return incoming_raw.to_string();
+    };
+    let Ok(mut incoming) = serde_json::from_str::<serde_json::Value>(incoming_raw) else {
+        return incoming_raw.to_string();
+    };
+    if let Some(obj) = incoming.as_object_mut() {
+        for key in ["gist_token_dpapi", "gist_sync_id", "gist_last_sync"] {
+            if let Some(v) = local_obj.get(key) {
+                obj.insert(key.to_string(), v.clone());
+            }
+        }
+    }
+    serde_json::to_string_pretty(&incoming).unwrap_or_else(|_| incoming_raw.to_string())
 }
 
 fn derive_backup_key(passphrase: &str, salt: &[u8; 16]) -> Result<[u8; 32], String> {

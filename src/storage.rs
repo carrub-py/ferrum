@@ -89,11 +89,30 @@ pub struct Workspace {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TabGroup {
+    pub id: String,
+    pub name: String,
+    pub color: String,
+    #[serde(default)]
+    pub collapsed: bool,
+    pub workspace_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomSearchEngine {
+    pub keyword: String,
+    pub name: String,
+    pub url_template: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SavedTab {
     pub url: String,
     pub title: String,
     pub pinned: bool,
     pub workspace_id: String,
+    #[serde(default)]
+    pub group_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -101,6 +120,8 @@ pub struct SessionData {
     pub tabs: Vec<SavedTab>,
     pub active_index: usize,
     pub active_workspace_id: String,
+    #[serde(default)]
+    pub groups: Vec<TabGroup>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -159,8 +180,18 @@ pub struct BrowserSettings {
     pub workspaces: Vec<Workspace>,
     pub allowlisted_domains: Vec<String>,
     pub custom_blocked_domains: Vec<String>,
+    pub custom_search_engines: Vec<CustomSearchEngine>,
+    #[serde(default = "default_true")]
+    pub onboarding_completed: bool,
+    pub gist_token_dpapi: Option<String>,
+    pub gist_sync_id: Option<String>,
+    pub gist_last_sync: u64,
     pub total_blocked_lifetime: u64,
     pub bytes_saved_lifetime: u64,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 impl Default for BrowserSettings {
@@ -189,6 +220,11 @@ impl Default for BrowserSettings {
             workspaces: default_workspaces(),
             allowlisted_domains: Vec::new(),
             custom_blocked_domains: Vec::new(),
+            custom_search_engines: Vec::new(),
+            onboarding_completed: true,
+            gist_token_dpapi: None,
+            gist_sync_id: None,
+            gist_last_sync: 0,
             total_blocked_lifetime: 0,
             bytes_saved_lifetime: 0,
         }
@@ -250,11 +286,16 @@ impl BrowserStorage {
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
 
-        let mut settings: BrowserSettings = fs::read_to_string(data_dir.join("settings.json"))
+        let settings_path = data_dir.join("settings.json");
+        let is_first_run = !settings_path.exists();
+        let mut settings: BrowserSettings = fs::read_to_string(&settings_path)
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
             .unwrap_or_default();
 
+        if is_first_run {
+            settings.onboarding_completed = false;
+        }
         if settings.workspaces.is_empty() {
             settings.workspaces = default_workspaces();
         }
@@ -756,6 +797,91 @@ impl BrowserStorage {
             false
         }
     }
+
+    pub fn add_custom_search_engine(
+        &mut self,
+        keyword: &str,
+        name: &str,
+        url_template: &str,
+    ) -> Result<(), String> {
+        let kw: String = keyword
+            .trim()
+            .trim_start_matches('!')
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+            .collect::<String>()
+            .to_ascii_lowercase();
+        let tpl = url_template.trim();
+        if kw.is_empty() {
+            return Err("Introduce un atajo válido (ej. py, wiki, docs).".into());
+        }
+        if !tpl.starts_with("https://") && !tpl.starts_with("http://") {
+            return Err("La plantilla URL debe comenzar con https:// o http://.".into());
+        }
+        if !tpl.contains("%s") {
+            return Err("La plantilla URL debe contener `%s` donde irá tu búsqueda.".into());
+        }
+        let clean_name = if name.trim().is_empty() {
+            kw.to_uppercase()
+        } else {
+            name.trim().to_string()
+        };
+        self.settings
+            .custom_search_engines
+            .retain(|e| !e.keyword.eq_ignore_ascii_case(&kw));
+        self.settings
+            .custom_search_engines
+            .push(CustomSearchEngine {
+                keyword: kw,
+                name: clean_name,
+                url_template: tpl.to_string(),
+            });
+        self.save_settings();
+        Ok(())
+    }
+
+    pub fn remove_custom_search_engine(&mut self, keyword: &str) {
+        let kw = keyword.trim().trim_start_matches('!');
+        self.settings
+            .custom_search_engines
+            .retain(|e| !e.keyword.eq_ignore_ascii_case(kw));
+        self.save_settings();
+    }
+
+    pub fn mark_onboarding_completed(&mut self) {
+        if !self.settings.onboarding_completed {
+            self.settings.onboarding_completed = true;
+            self.save_settings();
+        }
+    }
+
+    pub fn set_gist_sync_config(&mut self, token_dpapi: Option<String>, gist_id: Option<String>) {
+        if let Some(tok) = token_dpapi {
+            self.settings.gist_token_dpapi = if tok.is_empty() { None } else { Some(tok) };
+        }
+        if let Some(gid) = gist_id {
+            let trimmed = gid.trim().to_string();
+            self.settings.gist_sync_id = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            };
+        }
+        self.save_settings();
+    }
+
+    pub fn clear_gist_sync_config(&mut self) {
+        self.settings.gist_token_dpapi = None;
+        self.settings.gist_sync_id = None;
+        self.settings.gist_last_sync = 0;
+        self.save_settings();
+    }
+
+    pub fn record_gist_synced(&mut self, gist_id: String, synced_at: u64) {
+        self.settings.gist_sync_id = Some(gist_id);
+        self.settings.gist_last_sync = synced_at;
+        self.save_settings();
+    }
 }
 
 fn default_workspaces() -> Vec<Workspace> {
@@ -875,9 +1001,11 @@ mod tests {
                     title: "Example".into(),
                     pinned: true,
                     workspace_id: "ws_work".into(),
+                    group_id: None,
                 }],
                 active_index: 0,
                 active_workspace_id: "ws_work".into(),
+                groups: Vec::new(),
             });
         }
 

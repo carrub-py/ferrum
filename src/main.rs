@@ -4,12 +4,15 @@ mod adblock;
 mod autocomplete;
 mod backup;
 mod browser;
+mod calc;
+mod crash;
 mod extensions;
 mod importer;
 mod navigation;
 mod os_integration;
 mod single_instance;
 mod storage;
+mod sync;
 mod ui;
 mod updater;
 mod vault;
@@ -28,7 +31,7 @@ use tao::platform::windows::WindowBuilderExtWindows;
 use crate::browser::{AppLaunchMode, BrowserApp, BrowserEvent, ShortcutAction};
 use crate::navigation::resolve_cli_target;
 
-const FERRUM_ICON_RGBA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/ferrum_icon_32.rgba"));
+const FERRUM_ICON_RGBA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/ferrum_icon_64.rgba"));
 
 fn main() -> wry::Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -44,11 +47,10 @@ fn main() -> wry::Result<()> {
         updater::cleanup_old_binary_on_startup();
     }
 
-    if smoke_test || stress_test {
-        std::panic::set_hook(Box::new(|info| {
-            eprintln!("FERRUM_PANIC: {info}");
-        }));
-    }
+    let crash_data_dir = dirs::data_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("FerrumBrowser");
+    crash::install_panic_hook(crash_data_dir, smoke_test || stress_test);
 
     let app_url = args
         .iter()
@@ -87,7 +89,7 @@ fn main() -> wry::Result<()> {
         None
     };
 
-    let window_icon = Icon::from_rgba(FERRUM_ICON_RGBA.to_vec(), 32, 32).ok();
+    let window_icon = Icon::from_rgba(FERRUM_ICON_RGBA.to_vec(), 64, 64).ok();
 
     let (init_w, init_h, init_title) = if app_url.is_some() {
         (

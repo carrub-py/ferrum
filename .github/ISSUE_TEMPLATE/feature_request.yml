@@ -1,0 +1,19 @@
+name: Sugerir una mejora o función
+description: Propón una nueva característica para Ferrum Browser
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: ¿Qué necesidad o problema resuelve?
+      placeholder: Describe qué te gustaría poder hacer en Ferrum Browser.
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Propuesta de solución
+      placeholder: Cómo imaginas que debería funcionar o verse en la interfaz Apple Obsidian.
+    validations:
+      required: true

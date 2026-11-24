@@ -564,6 +564,11 @@ pub fn attach_content_hooks(
                                     ContextMenuAction::SearchSelection(sel.clone()),
                                 );
                                 add_item(
+                                    "Traducir selección al español",
+                                    None,
+                                    ContextMenuAction::TranslateSelection(sel.clone()),
+                                );
+                                add_item(
                                     "Guardar cita en Notas de Ferrum",
                                     None,
                                     ContextMenuAction::SaveSelectionToNotes(sel),
@@ -672,6 +677,9 @@ pub fn attach_accelerator_hooks(webview: &WebView, proxy: EventLoopProxy<Browser
                         k if k == b'S' as u32 && shift => Some(ShortcutAction::CaptureScreenshot),
                         k if k == b'C' as u32 && shift => Some(ShortcutAction::CopyCleanUrl),
                         k if k == b'M' as u32 && !shift => Some(ShortcutAction::ToggleMuteTab),
+                        k if k == b'M' as u32 && shift => {
+                            Some(ShortcutAction::MoveActiveTabToNewWindow)
+                        }
                         k if k == b'L' as u32 && !shift => Some(ShortcutAction::FocusOmnibox),
                         k if k == b'L' as u32 && shift => Some(ShortcutAction::QuickAutofill),
                         k if k == b'F' as u32 && !shift => Some(ShortcutAction::OpenFind),
@@ -709,6 +717,15 @@ pub fn attach_accelerator_hooks(webview: &WebView, proxy: EventLoopProxy<Browser
                         k if k == b'E' as u32 => Some(ShortcutAction::StartElementPicker),
                         _ => None,
                     }
+                } else if ctrl && alt && !shift {
+                    match vk {
+                        k if (b'1' as u32..=b'9' as u32).contains(&k) => Some(
+                            ShortcutAction::SwitchWorkspaceIndex((k - b'1' as u32) as usize),
+                        ),
+                        _ => None,
+                    }
+                } else if shift && !ctrl && !alt && vk == VK_ESCAPE.0 as u32 {
+                    Some(ShortcutAction::OpenTaskManager)
                 } else if !ctrl && !alt && !shift {
                     match vk {
                         k if k == VK_F5.0 as u32 => Some(ShortcutAction::Reload),

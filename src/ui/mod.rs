@@ -5,9 +5,10 @@ use crate::autocomplete::OmniboxSuggestion;
 use crate::extensions::{ChromiumExtensionInfo, UserScript};
 use crate::importer::DetectedBrowser;
 use crate::navigation::SearchEngine;
+use crate::os_integration::MemoryStats;
 use crate::storage::{
-    Bookmark, DownloadItem, HistoryEntry, LayoutMode, NoteItem, PermissionMode, PermissionSettings,
-    Workspace,
+    Bookmark, CustomSearchEngine, DownloadItem, HistoryEntry, LayoutMode, NoteItem, PermissionMode,
+    PermissionSettings, TabGroup, Workspace,
 };
 use crate::updater::UpdateInfo;
 
@@ -24,6 +25,7 @@ pub const NEWTAB_HTML: &str = include_str!("newtab.html");
 pub enum PanelTab {
     Commands,
     Shield,
+    Tasks,
     Vault,
     Extensions,
     Workspaces,
@@ -56,6 +58,7 @@ pub struct TabSummary {
     pub host: Option<String>,
     pub favicon_url: Option<String>,
     pub workspace_id: String,
+    pub group_id: Option<String>,
     pub pinned: bool,
     pub is_private: bool,
     pub is_hibernated: bool,
@@ -127,9 +130,34 @@ pub struct FindSnapshot {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct SiteInfoSnapshot {
+    pub host: String,
+    pub is_https: bool,
+    pub is_private: bool,
+    pub shield_enabled: bool,
+    pub site_allowlisted: bool,
+    pub tab_blocked: u64,
+    pub zoom_percent: u32,
+    pub reader_active: bool,
+    pub force_dark_active: bool,
+    pub permissions: PermissionSettings,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct OverlayState {
+    pub mode: String,
     pub suggestions: Vec<OmniboxSuggestion>,
     pub selected_index: usize,
+    pub site_info: Option<SiteInfoSnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SyncSnapshot {
+    pub has_token: bool,
+    pub gist_id: Option<String>,
+    pub last_sync: u64,
+    pub busy: bool,
+    pub status_text: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -154,6 +182,11 @@ pub struct UiState {
     pub audio_hub_open: bool,
     pub active_workspace_id: String,
     pub workspaces: Vec<Workspace>,
+    pub tab_groups: Vec<TabGroup>,
+    pub custom_search_engines: Vec<CustomSearchEngine>,
+    pub memory: MemoryStats,
+    pub sync: SyncSnapshot,
+    pub crash_reports_count: usize,
     pub layout_mode: LayoutMode,
     pub vertical_collapsed: bool,
     pub show_bookmarks_bar: bool,
@@ -197,6 +230,11 @@ pub struct NewTabData {
     pub bookmarks: Vec<Bookmark>,
     pub recent_history: Vec<HistoryEntry>,
     pub closed_tabs: Vec<ClosedTabInfo>,
+    pub show_onboarding: bool,
+    pub layout_mode: LayoutMode,
+    pub windows_registered: bool,
+    pub detected_browsers: Vec<DetectedBrowser>,
+    pub recovered_from_crash: bool,
 }
 
 /// Commands sent from trusted internal WebViews (chrome, pwa_chrome, vertical, overlay, divider, panel, newtab) to Rust.
@@ -222,6 +260,55 @@ pub enum IpcCommand {
     OmniboxClose,
     SelectSuggestion {
         index: usize,
+    },
+    ToggleSiteInfoPopover {
+        left: f64,
+    },
+    CloseOverlay,
+    CreateTabGroup {
+        tab_id: u64,
+        name: String,
+        color: String,
+    },
+    AssignTabToGroup {
+        tab_id: u64,
+        group_id: Option<String>,
+    },
+    ToggleTabGroupCollapse {
+        group_id: String,
+    },
+    RenameTabGroup {
+        group_id: String,
+        name: String,
+        color: Option<String>,
+    },
+    UngroupTabGroup {
+        group_id: String,
+    },
+    CloseTabGroup {
+        group_id: String,
+    },
+    HibernateAllInactive,
+    RefreshMemoryStats,
+    AddCustomSearchEngine {
+        keyword: String,
+        name: String,
+        url_template: String,
+    },
+    RemoveCustomSearchEngine {
+        keyword: String,
+    },
+    CompleteOnboarding,
+    SaveGistSyncConfig {
+        token: String,
+        gist_id: String,
+    },
+    ClearGistSyncConfig,
+    SyncGistPush {
+        passphrase: String,
+    },
+    SyncGistPull {
+        passphrase: String,
     },
     NewTab {
         url: Option<String>,

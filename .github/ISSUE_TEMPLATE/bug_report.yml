@@ -1,0 +1,43 @@
+name: Reportar un error (Bug)
+description: Reporta un fallo o comportamiento inesperado en Ferrum Browser
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Versión de Ferrum Browser
+      placeholder: "ej. v0.6.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Sistema operativo
+      options:
+        - Windows 11 (x64)
+        - Windows 10 (x64)
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Descripción del problema
+      placeholder: Explica qué pasó y qué esperabas que sucediera.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducirlo
+      placeholder: |
+        1. Abrir Ferrum Browser
+        2. Hacer clic en...
+        3. Observar el error...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Reporte de fallo (opcional)
+      description: Si existe un log reciente en `%APPDATA%\FerrumBrowser\crashes\`, puedes pegarlo aquí (no contiene URLs ni contraseñas).

@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use url::Url;
 
+use crate::storage::CustomSearchEngine;
+
 pub const INTERNAL_PROTOCOL: &str = "ferrum";
 pub const INTERNAL_NEWTAB_DISPLAY: &str = "ferrum://newtab";
 pub const INTERNAL_NEWTAB_URL: &str = "ferrum://localhost/newtab";
@@ -221,9 +223,94 @@ pub fn resolve_cli_target(arg: &str, https_only: bool, strip_trackers: bool) -> 
     None
 }
 
+/// Matches built-in or user-defined search bangs (e.g. `!yt lo-fi`, `gh wry`, `!py requests`).
+/// Returns `(engine_name, raw_query, resolved_url)`.
+pub fn match_search_bang(
+    input: &str,
+    custom_engines: &[CustomSearchEngine],
+) -> Option<(String, String, String)> {
+    let trimmed = input.trim();
+    let (prefix, rest) = trimmed.split_once(' ')?;
+    let query = rest.trim();
+    if query.is_empty() {
+        return None;
+    }
+    let encoded = percent_encode_query(query);
+    let p_low = prefix.to_ascii_lowercase();
+    let kw = p_low.trim_start_matches('!');
+
+    // Check user-defined custom search shortcuts first so users can override defaults
+    if let Some(custom) = custom_engines
+        .iter()
+        .find(|e| e.keyword.eq_ignore_ascii_case(kw))
+    {
+        let resolved = custom.url_template.replace("%s", &encoded);
+        return Some((custom.name.clone(), query.to_string(), resolved));
+    }
+
+    let built_in: Option<(&str, String)> = match p_low.as_str() {
+        "g" | "!g" => Some((
+            "Google",
+            format!("https://www.google.com/search?q={encoded}"),
+        )),
+        "ddg" | "!ddg" => Some(("DuckDuckGo", format!("https://duckduckgo.com/?q={encoded}"))),
+        "brave" | "!b" | "!brave" => Some((
+            "Brave Search",
+            format!("https://search.brave.com/search?q={encoded}"),
+        )),
+        "gh" | "!gh" => Some(("GitHub", format!("https://github.com/search?q={encoded}"))),
+        "yt" | "!yt" => Some((
+            "YouTube",
+            format!("https://www.youtube.com/results?search_query={encoded}"),
+        )),
+        "w" | "!w" => Some((
+            "Wikipedia",
+            format!("https://es.wikipedia.org/w/index.php?search={encoded}"),
+        )),
+        "crates" | "!c" | "!rs" => {
+            Some(("crates.io", format!("https://crates.io/search?q={encoded}")))
+        }
+        "mdn" | "!mdn" => Some((
+            "MDN Web Docs",
+            format!("https://developer.mozilla.org/en-US/search?q={encoded}"),
+        )),
+        "so" | "!so" => Some((
+            "Stack Overflow",
+            format!("https://stackoverflow.com/search?q={encoded}"),
+        )),
+        "npm" | "!npm" => Some(("npm", format!("https://www.npmjs.com/search?q={encoded}"))),
+        "r" | "!r" | "!reddit" => Some((
+            "Reddit",
+            format!("https://www.reddit.com/search/?q={encoded}"),
+        )),
+        "tr" | "!tr" => Some((
+            "Traductor",
+            format!("https://translate.google.com/?sl=auto&tl=es&text={encoded}"),
+        )),
+        "maps" | "!maps" => Some((
+            "Google Maps",
+            format!("https://www.google.com/maps/search/{encoded}"),
+        )),
+        "amz" | "!amz" => Some(("Amazon", format!("https://www.amazon.com/s?k={encoded}"))),
+        _ => None,
+    };
+
+    built_in.map(|(name, url)| (name.to_string(), query.to_string(), url))
+}
+
 pub fn resolve_omnibox_input(
     input: &str,
     engine: SearchEngine,
+    https_only: bool,
+    strip_trackers: bool,
+) -> String {
+    resolve_omnibox_input_with_custom(input, engine, &[], https_only, strip_trackers)
+}
+
+pub fn resolve_omnibox_input_with_custom(
+    input: &str,
+    engine: SearchEngine,
+    custom_engines: &[CustomSearchEngine],
     https_only: bool,
     strip_trackers: bool,
 ) -> String {
@@ -248,30 +335,9 @@ pub fn resolve_omnibox_input(
         return file_url.to_string();
     }
 
-    // Quick search bangs
-    if let Some((prefix, rest)) = trimmed.split_once(' ') {
-        let query = rest.trim();
-        if !query.is_empty() {
-            let encoded = percent_encode_query(query);
-            match prefix.to_ascii_lowercase().as_str() {
-                "g" | "!g" => return format!("https://www.google.com/search?q={encoded}"),
-                "ddg" | "!ddg" => return format!("https://duckduckgo.com/?q={encoded}"),
-                "brave" | "!b" => return format!("https://search.brave.com/search?q={encoded}"),
-                "gh" | "!gh" => return format!("https://github.com/search?q={encoded}"),
-                "yt" | "!yt" => {
-                    return format!("https://www.youtube.com/results?search_query={encoded}");
-                }
-                "w" | "!w" => {
-                    return format!("https://es.wikipedia.org/w/index.php?search={encoded}");
-                }
-                "crates" | "!c" => return format!("https://crates.io/search?q={encoded}"),
-                "mdn" | "!mdn" => {
-                    return format!("https://developer.mozilla.org/en-US/search?q={encoded}");
-                }
-                "so" | "!so" => return format!("https://stackoverflow.com/search?q={encoded}"),
-                _ => {}
-            }
-        }
+    // Quick search bangs (built-in + custom engines)
+    if let Some((_, _, bang_url)) = match_search_bang(trimmed, custom_engines) {
+        return bang_url;
     }
 
     if trimmed.contains("://")
@@ -385,6 +451,25 @@ mod tests {
         assert_eq!(
             resolve_omnibox_input("ferrum://newtab", SearchEngine::DuckDuckGo, true, true),
             INTERNAL_NEWTAB_URL
+        );
+        let custom = vec![CustomSearchEngine {
+            keyword: "py".into(),
+            name: "PyPI".into(),
+            url_template: "https://pypi.org/search/?q=%s".into(),
+        }];
+        assert_eq!(
+            resolve_omnibox_input_with_custom(
+                "!py requests",
+                SearchEngine::DuckDuckGo,
+                &custom,
+                true,
+                true
+            ),
+            "https://pypi.org/search/?q=requests"
+        );
+        assert_eq!(
+            resolve_omnibox_input("!npm vite", SearchEngine::DuckDuckGo, true, true),
+            "https://www.npmjs.com/search?q=vite"
         );
     }
 }
