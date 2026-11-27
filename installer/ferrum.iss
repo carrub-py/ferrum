@@ -2,7 +2,7 @@
 ; Compilado automáticamente por GitHub Actions con Inno Setup 6 (`iscc`)
 
 #ifndef AppVersion
-  #define AppVersion "0.6.0"
+  #define AppVersion "0.6.1"
 #endif
 #ifndef SourceDir
   #define SourceDir "..\dist"

@@ -1,6 +1,6 @@
 [package]
 name = "ferrum-browser"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2024"
 description = "Navegador web de escritorio en Rust: minimalismo Apple Obsidian, motor adblock-rust, contenedores aislados, bóveda cifrada, vista dividida y actualizaciones SHA-256"
 license = "MIT"

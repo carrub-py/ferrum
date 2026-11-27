@@ -81,6 +81,8 @@ const PANEL_WIDTH: u32 = 368;
 const VERTICAL_WIDTH_EXPANDED: u32 = 224;
 const VERTICAL_WIDTH_COLLAPSED: u32 = 52;
 const DIVIDER_WIDTH: u32 = 6;
+#[cfg(target_os = "windows")]
+const WEBVIEW_BROWSER_ARGS: &str = "--process-per-site --disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,msEdgeCollections,msEdgeShoppingAssistant,msEdgeSidebarV2,OptimizationHints --disable-background-networking --disable-component-update";
 
 #[derive(Debug, Clone)]
 pub enum AppLaunchMode {
@@ -275,6 +277,7 @@ struct Tab {
     id: u64,
     webview: Option<WebView>,
     is_visible: bool,
+    is_suspended: bool,
     title: String,
     url: String,
     favicon_url: Option<String>,
@@ -307,9 +310,9 @@ pub struct BrowserApp {
     bridge_nonce: Arc<String>,
     page_init_script: String,
     chrome_webview: WebView,
-    vertical_webview: WebView,
+    vertical_webview: Option<WebView>,
     overlay_webview: WebView,
-    divider_webview: WebView,
+    divider_webview: Option<WebView>,
     panel_webview: WebView,
     tabs: Vec<Tab>,
     tab_groups: Vec<TabGroup>,
@@ -452,8 +455,13 @@ impl BrowserApp {
             }
         };
 
-        // 1. Top Chrome WebView (adaptive Apple Noir chrome or minimal 34px PWA bar)
+        // 1. Top Chrome WebView (shared `ferrum://localhost/*` origin so UI views coalesce into 1 renderer)
         let chrome_proxy = proxy.clone();
+        let chrome_html: &'static str = if is_pwa_mode {
+            PWA_CHROME_HTML
+        } else {
+            CHROME_HTML
+        };
         let chrome_builder = WebViewBuilder::new_with_web_context(&mut web_context)
             .with_bounds(Rect {
                 position: LogicalPosition::new(0, 0).into(),
@@ -462,13 +470,12 @@ impl BrowserApp {
             .with_visible(false)
             .with_focused(false)
             .with_background_color((0, 0, 0, 255))
-            .with_html(if is_pwa_mode {
-                PWA_CHROME_HTML
-            } else {
-                CHROME_HTML
+            .with_custom_protocol(INTERNAL_PROTOCOL.into(), move |_id, _req| {
+                build_static_ui_response(chrome_html)
             })
+            .with_url("ferrum://localhost/chrome")
             .with_devtools(false)
-            .with_navigation_handler(|url| url == "about:blank" || url.starts_with("data:"))
+            .with_navigation_handler(is_internal_ui_navigation)
             .with_ipc_handler(move |req| {
                 if let Ok(cmd) = serde_json::from_str::<IpcCommand>(req.body()) {
                     let _ = chrome_proxy.send_event(BrowserEvent::Ipc(cmd));
@@ -477,6 +484,7 @@ impl BrowserApp {
 
         #[cfg(target_os = "windows")]
         let chrome_builder = chrome_builder
+            .with_additional_browser_args(WEBVIEW_BROWSER_ARGS)
             .with_theme(Theme::Dark)
             .with_browser_extensions_enabled(true)
             .with_extensions_path(extensions_dir)
@@ -491,133 +499,67 @@ impl BrowserApp {
         #[cfg(target_os = "windows")]
         let shared_env = chrome_webview.environment();
 
-        // 2. Left Vertical Tab Sidebar WebView (Arc / Zen mode)
-        let vert_w = if storage.settings.vertical_collapsed {
-            VERTICAL_WIDTH_COLLAPSED
-        } else {
-            VERTICAL_WIDTH_EXPANDED
-        };
-        let vert_proxy = proxy.clone();
-        let vert_builder = WebViewBuilder::new()
-            .with_bounds(Rect {
-                position: LogicalPosition::new(0, top_h).into(),
-                size: LogicalSize::new(vert_w, win_h.saturating_sub(top_h)).into(),
-            })
-            .with_visible(false)
-            .with_focused(false)
-            .with_background_color((5, 5, 7, 255))
-            .with_html(VERTICAL_HTML)
-            .with_devtools(false)
-            .with_navigation_handler(|url| url == "about:blank" || url.starts_with("data:"))
-            .with_ipc_handler(move |req| {
-                if let Ok(cmd) = serde_json::from_str::<IpcCommand>(req.body()) {
-                    let _ = vert_proxy.send_event(BrowserEvent::Ipc(cmd));
-                }
-            });
+        // 2. Left Vertical Tab Sidebar WebView — created LAZILY only when Vertical mode is active!
+        let vertical_webview =
+            if !is_pwa_mode && storage.settings.layout_mode == LayoutMode::Vertical {
+                let vert_w = if storage.settings.vertical_collapsed {
+                    VERTICAL_WIDTH_COLLAPSED
+                } else {
+                    VERTICAL_WIDTH_EXPANDED
+                };
+                Some(build_internal_ui_webview(
+                    &window,
+                    #[cfg(target_os = "windows")]
+                    &shared_env,
+                    proxy.clone(),
+                    "ferrum://localhost/vertical",
+                    VERTICAL_HTML,
+                    Rect {
+                        position: LogicalPosition::new(0, top_h).into(),
+                        size: LogicalSize::new(vert_w, win_h.saturating_sub(top_h)).into(),
+                    },
+                    (5, 5, 7, 255),
+                )?)
+            } else {
+                None
+            };
 
-        #[cfg(target_os = "windows")]
-        let vert_builder = vert_builder
-            .with_environment(shared_env.clone())
-            .with_theme(Theme::Dark)
-            .with_default_context_menus(false)
-            .with_browser_accelerator_keys(false)
-            .with_scroll_bar_style(ScrollBarStyle::FluentOverlay);
-
-        let vertical_webview = vert_builder.build_as_child(&window)?;
-        webview_hooks::enable_clip_siblings(&vertical_webview);
-        webview_hooks::attach_accelerator_hooks(&vertical_webview, proxy.clone());
-
-        // 3. Floating Omnibox Autocomplete Overlay WebView
-        let overlay_proxy = proxy.clone();
-        let overlay_builder = WebViewBuilder::new()
-            .with_bounds(Rect {
+        // 3. Floating Omnibox & Site Shield Overlay WebView (warm on shared renderer, Low RAM when hidden)
+        let overlay_webview = build_internal_ui_webview(
+            &window,
+            #[cfg(target_os = "windows")]
+            &shared_env,
+            proxy.clone(),
+            "ferrum://localhost/overlay",
+            OVERLAY_HTML,
+            Rect {
                 position: LogicalPosition::new(280, 40).into(),
                 size: LogicalSize::new(500, 120).into(),
-            })
-            .with_visible(false)
-            .with_focused(false)
-            .with_background_color((13, 13, 17, 255))
-            .with_html(OVERLAY_HTML)
-            .with_devtools(false)
-            .with_navigation_handler(|url| url == "about:blank" || url.starts_with("data:"))
-            .with_ipc_handler(move |req| {
-                if let Ok(cmd) = serde_json::from_str::<IpcCommand>(req.body()) {
-                    let _ = overlay_proxy.send_event(BrowserEvent::Ipc(cmd));
-                }
-            });
-
+            },
+            (13, 13, 17, 255),
+        )?;
         #[cfg(target_os = "windows")]
-        let overlay_builder = overlay_builder
-            .with_environment(shared_env.clone())
-            .with_theme(Theme::Dark)
-            .with_default_context_menus(false)
-            .with_browser_accelerator_keys(false)
-            .with_scroll_bar_style(ScrollBarStyle::FluentOverlay);
+        let _ = overlay_webview.set_memory_usage_level(MemoryUsageLevel::Low);
 
-        let overlay_webview = overlay_builder.build_as_child(&window)?;
-        webview_hooks::enable_clip_siblings(&overlay_webview);
-        webview_hooks::attach_accelerator_hooks(&overlay_webview, proxy.clone());
+        // 4. Draggable Split View Divider — created LAZILY only while Split View is active!
+        let divider_webview: Option<WebView> = None;
 
-        // 4. Draggable Split View Divider WebView
-        let div_proxy = proxy.clone();
-        let div_builder = WebViewBuilder::new()
-            .with_bounds(Rect {
-                position: LogicalPosition::new(win_w / 2, top_h).into(),
-                size: LogicalSize::new(DIVIDER_WIDTH, win_h.saturating_sub(top_h)).into(),
-            })
-            .with_visible(false)
-            .with_focused(false)
-            .with_background_color((5, 5, 7, 255))
-            .with_html(DIVIDER_HTML)
-            .with_devtools(false)
-            .with_navigation_handler(|url| url == "about:blank" || url.starts_with("data:"))
-            .with_ipc_handler(move |req| {
-                if let Ok(cmd) = serde_json::from_str::<IpcCommand>(req.body()) {
-                    let _ = div_proxy.send_event(BrowserEvent::Ipc(cmd));
-                }
-            });
-
-        #[cfg(target_os = "windows")]
-        let div_builder = div_builder
-            .with_environment(shared_env.clone())
-            .with_theme(Theme::Dark)
-            .with_default_context_menus(false)
-            .with_browser_accelerator_keys(false);
-
-        let divider_webview = div_builder.build_as_child(&window)?;
-        webview_hooks::enable_clip_siblings(&divider_webview);
-        webview_hooks::attach_accelerator_hooks(&divider_webview, proxy.clone());
-
-        // 5. Right Sidebar Panel WebView
-        let panel_proxy = proxy.clone();
-        let panel_builder = WebViewBuilder::new()
-            .with_bounds(Rect {
+        // 5. Right Sidebar Panel WebView (warm on shared renderer, Low RAM when hidden)
+        let panel_webview = build_internal_ui_webview(
+            &window,
+            #[cfg(target_os = "windows")]
+            &shared_env,
+            proxy.clone(),
+            "ferrum://localhost/panel",
+            PANEL_HTML,
+            Rect {
                 position: LogicalPosition::new(win_w.saturating_sub(PANEL_WIDTH), top_h).into(),
                 size: LogicalSize::new(PANEL_WIDTH, win_h.saturating_sub(top_h)).into(),
-            })
-            .with_visible(false)
-            .with_focused(false)
-            .with_background_color((7, 7, 9, 255))
-            .with_html(PANEL_HTML)
-            .with_devtools(false)
-            .with_navigation_handler(|url| url == "about:blank" || url.starts_with("data:"))
-            .with_ipc_handler(move |req| {
-                if let Ok(cmd) = serde_json::from_str::<IpcCommand>(req.body()) {
-                    let _ = panel_proxy.send_event(BrowserEvent::Ipc(cmd));
-                }
-            });
-
+            },
+            (7, 7, 9, 255),
+        )?;
         #[cfg(target_os = "windows")]
-        let panel_builder = panel_builder
-            .with_environment(shared_env.clone())
-            .with_theme(Theme::Dark)
-            .with_default_context_menus(false)
-            .with_browser_accelerator_keys(false)
-            .with_scroll_bar_style(ScrollBarStyle::FluentOverlay);
-
-        let panel_webview = panel_builder.build_as_child(&window)?;
-        webview_hooks::enable_clip_siblings(&panel_webview);
-        webview_hooks::attach_accelerator_hooks(&panel_webview, proxy.clone());
+        let _ = panel_webview.set_memory_usage_level(MemoryUsageLevel::Low);
 
         let spare_timer_tx = if !is_pwa_mode && !smoke_test {
             let (tx, rx) = std::sync::mpsc::channel::<(u64, Duration)>();
@@ -890,7 +832,9 @@ impl BrowserApp {
 
     pub fn handle_window_moved(&self) {
         webview_hooks::notify_parent_moved(&self.chrome_webview);
-        webview_hooks::notify_parent_moved(&self.vertical_webview);
+        if let Some(vw) = &self.vertical_webview {
+            webview_hooks::notify_parent_moved(vw);
+        }
         webview_hooks::notify_parent_moved(&self.panel_webview);
         if let Some(wv) = self.active_webview() {
             webview_hooks::notify_parent_moved(wv);
@@ -939,8 +883,11 @@ impl BrowserApp {
         if let Ok(json) = serde_json::to_string(&state) {
             let js = format!("window.__ferrumUpdateState && window.__ferrumUpdateState({json});");
             let _ = self.chrome_webview.evaluate_script(&js);
-            if !self.is_pwa_mode && self.storage.settings.layout_mode == LayoutMode::Vertical {
-                let _ = self.vertical_webview.evaluate_script(&js);
+            if !self.is_pwa_mode
+                && self.storage.settings.layout_mode == LayoutMode::Vertical
+                && let Some(vw) = &self.vertical_webview
+            {
+                let _ = vw.evaluate_script(&js);
             }
             if !self.is_pwa_mode && self.open_panel.is_some() {
                 let _ = self.panel_webview.evaluate_script(&js);
@@ -968,8 +915,7 @@ impl BrowserApp {
     }
 
     fn warm_spare_tab(&mut self) {
-        if self.is_pwa_mode || self.smoke_test || self.spare_tab.is_some() || self.tabs.len() >= 12
-        {
+        if self.is_pwa_mode || self.smoke_test || self.spare_tab.is_some() || self.tabs.len() >= 6 {
             return;
         }
         self.refresh_newtab_snapshot(false);
@@ -984,6 +930,8 @@ impl BrowserApp {
             host_cell.clone(),
             bounds,
         ) {
+            #[cfg(target_os = "windows")]
+            let _ = webview.set_memory_usage_level(MemoryUsageLevel::Low);
             self.spare_tab = Some(SpareTab {
                 webview,
                 tab_id_cell,
@@ -993,6 +941,7 @@ impl BrowserApp {
     }
 
     fn run_periodic_maintenance(&mut self) {
+        self.suspend_idle_background_tabs();
         self.check_auto_hibernation();
         if self.open_panel == Some(PanelTab::Tasks) {
             self.refresh_memory_stats_async();
@@ -1003,6 +952,29 @@ impl BrowserApp {
         {
             self.generated_password = None;
             self.show_toast("Bóveda bloqueada automáticamente por inactividad");
+        }
+    }
+
+    /// Soft-suspends hidden background tabs inactive for >= 60s via `ICoreWebView2_3::TrySuspend`.
+    /// Reclaims V8/compositor RAM while preserving DOM & scroll state for instant (~1-3ms) resume.
+    fn suspend_idle_background_tabs(&mut self) {
+        if self.is_pwa_mode {
+            return;
+        }
+        let cutoff = Duration::from_secs(60);
+        for tab in &mut self.tabs {
+            if !tab.is_visible
+                && !tab.is_suspended
+                && tab.id != self.active_tab_id
+                && self.split_tab_id != Some(tab.id)
+                && !tab.loading
+                && !tab.is_playing_audio
+                && tab.last_active.elapsed() >= cutoff
+                && let Some(wv) = &tab.webview
+            {
+                webview_hooks::suspend_webview(wv);
+                tab.is_suspended = true;
+            }
         }
     }
 
@@ -1651,6 +1623,61 @@ impl BrowserApp {
             BrowserEvent::TestTimeout | BrowserEvent::RequestExit => {}
         }
     }
+}
+
+fn build_static_ui_response(html: &'static str) -> Response<Cow<'static, [u8]>> {
+    Response::builder()
+        .header("Content-Type", "text/html; charset=utf-8")
+        .header("Cache-Control", "no-store")
+        .body(Cow::Borrowed(html.as_bytes()))
+        .unwrap()
+}
+
+fn is_internal_ui_navigation(url: String) -> bool {
+    url == "about:blank" || url.starts_with(INTERNAL_ORIGIN_PREFIX) || url.starts_with("ferrum://")
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_internal_ui_webview(
+    window: &Window,
+    #[cfg(target_os = "windows")]
+    shared_env: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Environment,
+    proxy: EventLoopProxy<BrowserEvent>,
+    url: &str,
+    html: &'static str,
+    bounds: Rect,
+    bg: (u8, u8, u8, u8),
+) -> wry::Result<WebView> {
+    let ipc_proxy = proxy.clone();
+    let builder = WebViewBuilder::new()
+        .with_bounds(bounds)
+        .with_visible(false)
+        .with_focused(false)
+        .with_background_color(bg)
+        .with_custom_protocol(INTERNAL_PROTOCOL.into(), move |_id, _req| {
+            build_static_ui_response(html)
+        })
+        .with_url(url)
+        .with_devtools(false)
+        .with_navigation_handler(is_internal_ui_navigation)
+        .with_ipc_handler(move |req| {
+            if let Ok(cmd) = serde_json::from_str::<IpcCommand>(req.body()) {
+                let _ = ipc_proxy.send_event(BrowserEvent::Ipc(cmd));
+            }
+        });
+
+    #[cfg(target_os = "windows")]
+    let builder = builder
+        .with_environment(shared_env.clone())
+        .with_theme(Theme::Dark)
+        .with_default_context_menus(false)
+        .with_browser_accelerator_keys(false)
+        .with_scroll_bar_style(ScrollBarStyle::FluentOverlay);
+
+    let wv = builder.build_as_child(window)?;
+    webview_hooks::enable_clip_siblings(&wv);
+    webview_hooks::attach_accelerator_hooks(&wv, proxy);
+    Ok(wv)
 }
 
 fn is_dangerous_download_path(path: &str) -> bool {

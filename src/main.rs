@@ -318,7 +318,7 @@ fn main() -> wry::Result<()> {
                 // Only non-blocking UI & session flushing runs here — never WebView creation!
                 app.flush_ui_if_dirty();
 
-                if smoke_test && ui_ready_count >= 3 && page_finished {
+                if smoke_test && ui_ready_count >= 2 && page_finished {
                     println!(
                         "SMOKE_OK: tabs={} ui_ready={} page_finished={}",
                         app.tabs_count(),

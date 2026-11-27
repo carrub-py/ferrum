@@ -35,6 +35,7 @@ impl BrowserApp {
             id: tab_id,
             webview: None,
             is_visible: false,
+            is_suspended: false,
             title,
             url: display_url,
             favicon_url: None,
@@ -127,6 +128,7 @@ impl BrowserApp {
             id: tab_id,
             webview: Some(webview),
             is_visible: false,
+            is_suspended: false,
             title: initial_title,
             url: display_url,
             favicon_url: None,
@@ -349,6 +351,7 @@ impl BrowserApp {
         };
         webview_hooks::destroy_webview_smooth(wv);
         tab.is_visible = false;
+        tab.is_suspended = false;
         tab.loading = false;
         tab.is_playing_audio = false;
         tab.reader_active = false;
@@ -403,6 +406,7 @@ impl BrowserApp {
             if let Some(tab) = self.tabs.iter_mut().find(|t| t.id == id) {
                 tab.webview = Some(wv);
                 tab.is_visible = false;
+                tab.is_suspended = false;
                 tab.loading = !is_internal_url(&target);
                 tab.last_active = Instant::now();
             }

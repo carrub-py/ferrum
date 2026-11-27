@@ -1098,14 +1098,14 @@
     bodyEl.innerHTML = `
       <div class="page-head">
         <h2 class="page-title">Ajustes</h2>
-        <span class="tag Custom">v${esc(s.updater?.current_version || '0.6.0')}</span>
+        <span class="tag Custom">v${esc(s.updater?.current_version || '0.6.1')}</span>
       </div>
 
       <div class="sec-lbl"><span>Actualizaciones automáticas (GitHub)</span></div>
       <div class="group group-pad vstack">
         <div class="hstack" style="justify-content:space-between;">
           <div class="row-main">
-            <div class="row-title">Ferrum Browser v${esc(s.updater?.current_version || '0.6.0')}</div>
+            <div class="row-title">Ferrum Browser v${esc(s.updater?.current_version || '0.6.1')}</div>
             <div class="row-sub wrap">${esc(s.updater?.status_text || 'Verificación automática con firma SHA-256 desde GitHub Releases.')}</div>
           </div>
           ${s.updater?.available ? `<span class="tag ok">v${esc(s.updater.available.version)}</span>` : ''}

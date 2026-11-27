@@ -185,6 +185,10 @@ impl BrowserApp {
             self.overlay_suggestions.clear();
             self.overlay_selected = 0;
             webview_hooks::hide_webview_smooth(&self.overlay_webview);
+            #[cfg(target_os = "windows")]
+            let _ = self
+                .overlay_webview
+                .set_memory_usage_level(MemoryUsageLevel::Low);
         }
     }
 
@@ -224,6 +228,10 @@ impl BrowserApp {
             },
             self.window.scale_factor(),
         );
+        #[cfg(target_os = "windows")]
+        let _ = self
+            .overlay_webview
+            .set_memory_usage_level(MemoryUsageLevel::Normal);
         webview_hooks::bring_webview_to_top(&self.overlay_webview);
         webview_hooks::show_webview_smooth(&self.overlay_webview);
         self.push_overlay_state();

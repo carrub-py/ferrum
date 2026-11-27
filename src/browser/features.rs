@@ -138,6 +138,10 @@ impl BrowserApp {
             }
             tab.loading = true;
             if let Some(wv) = &tab.webview {
+                if tab.is_suspended {
+                    webview_hooks::resume_webview(wv);
+                    tab.is_suspended = false;
+                }
                 let _ = wv.load_url(url);
             }
         }
@@ -328,8 +332,12 @@ impl BrowserApp {
             self.window
                 .set_fullscreen(Some(Fullscreen::Borderless(None)));
             webview_hooks::hide_webview_smooth(&self.chrome_webview);
-            webview_hooks::hide_webview_smooth(&self.vertical_webview);
-            webview_hooks::hide_webview_smooth(&self.divider_webview);
+            if let Some(vw) = &self.vertical_webview {
+                webview_hooks::hide_webview_smooth(vw);
+            }
+            if let Some(div) = &self.divider_webview {
+                webview_hooks::hide_webview_smooth(div);
+            }
             webview_hooks::hide_webview_smooth(&self.panel_webview);
         } else {
             self.window.set_fullscreen(None);

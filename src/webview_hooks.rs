@@ -1133,6 +1133,36 @@ pub fn hide_webview_smooth(webview: &WebView) {
     }
 }
 
+/// Suspends a hidden WebView2 via `ICoreWebView2_3::TrySuspend` so Chromium frees V8/compositor
+/// memory while preserving full DOM/scroll state for instant (~1-3ms) `resume_webview()`.
+#[cfg(target_os = "windows")]
+pub fn suspend_webview(webview: &WebView) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2_3;
+    use webview2_com::TrySuspendCompletedHandler;
+    use windows_core::Interface;
+    use wry::WebViewExtWindows;
+
+    unsafe {
+        if let Ok(core3) = webview.webview().cast::<ICoreWebView2_3>() {
+            let _ = core3.TrySuspend(&TrySuspendCompletedHandler::create(Box::new(|_, _| Ok(()))));
+        }
+    }
+}
+
+/// Resumes a previously suspended WebView2 instantaneously without reloading the page.
+#[cfg(target_os = "windows")]
+pub fn resume_webview(webview: &WebView) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2_3;
+    use windows_core::Interface;
+    use wry::WebViewExtWindows;
+
+    unsafe {
+        if let Ok(core3) = webview.webview().cast::<ICoreWebView2_3>() {
+            let _ = core3.Resume();
+        }
+    }
+}
+
 #[cfg(target_os = "windows")]
 pub fn destroy_webview_smooth(webview: WebView) {
     use windows::Win32::UI::WindowsAndMessaging::{
@@ -1626,6 +1656,10 @@ pub fn show_webview_smooth(webview: &WebView) {
 pub fn hide_webview_smooth(webview: &WebView) {
     let _ = webview.set_visible(false);
 }
+#[cfg(not(target_os = "windows"))]
+pub fn suspend_webview(_webview: &WebView) {}
+#[cfg(not(target_os = "windows"))]
+pub fn resume_webview(_webview: &WebView) {}
 #[cfg(not(target_os = "windows"))]
 pub fn destroy_webview_smooth(webview: WebView) {
     let _ = webview.set_visible(false);

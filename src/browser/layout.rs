@@ -162,6 +162,10 @@ impl BrowserApp {
 
             if is_primary {
                 let (x, y, w, h) = primary_rect;
+                if tab.is_suspended {
+                    webview_hooks::resume_webview(wv);
+                    tab.is_suspended = false;
+                }
                 webview_hooks::set_webview_bounds_physical(wv, x, y, w, h);
                 webview_hooks::bring_webview_to_top(wv);
                 webview_hooks::show_webview_smooth(wv);
@@ -169,6 +173,10 @@ impl BrowserApp {
                 let _ = wv.set_memory_usage_level(MemoryUsageLevel::Normal);
                 tab.is_visible = true;
             } else if let (true, Some((x, y, w, h))) = (is_secondary, secondary_rect) {
+                if tab.is_suspended {
+                    webview_hooks::resume_webview(wv);
+                    tab.is_suspended = false;
+                }
                 webview_hooks::set_webview_bounds_physical(wv, x, y, w, h);
                 webview_hooks::bring_webview_to_top(wv);
                 webview_hooks::show_webview_smooth(wv);
@@ -179,14 +187,35 @@ impl BrowserApp {
         }
 
         if let Some((x, y, w, h)) = divider_rect {
-            webview_hooks::set_webview_bounds_physical(&self.divider_webview, x, y, w, h);
-            webview_hooks::bring_webview_to_top(&self.divider_webview);
-            webview_hooks::show_webview_smooth(&self.divider_webview);
+            if self.divider_webview.is_none()
+                && let Ok(div) = build_internal_ui_webview(
+                    &self.window,
+                    #[cfg(target_os = "windows")]
+                    &self.shared_env,
+                    self.proxy.clone(),
+                    "ferrum://localhost/divider",
+                    DIVIDER_HTML,
+                    Rect {
+                        position: wry::dpi::PhysicalPosition::new(x, y).into(),
+                        size: wry::dpi::PhysicalSize::new(w.max(1) as u32, h.max(1) as u32).into(),
+                    },
+                    (5, 5, 7, 255),
+                )
+            {
+                self.divider_webview = Some(div);
+            }
+            if let Some(div) = &self.divider_webview {
+                webview_hooks::set_webview_bounds_physical(div, x, y, w, h);
+                webview_hooks::bring_webview_to_top(div);
+                webview_hooks::show_webview_smooth(div);
+            }
         }
 
         // PASS 2: Only AFTER the active view covers the viewport, hide previously visible inactive tabs
-        if divider_rect.is_none() {
-            webview_hooks::hide_webview_smooth(&self.divider_webview);
+        if divider_rect.is_none()
+            && let Some(div) = self.divider_webview.take()
+        {
+            webview_hooks::destroy_webview_smooth(div);
         }
 
         for tab in &mut self.tabs {
@@ -263,16 +292,34 @@ impl BrowserApp {
             webview_hooks::show_webview_smooth(&self.chrome_webview);
 
             if left_px > 0 {
-                webview_hooks::set_webview_bounds_physical(
-                    &self.vertical_webview,
-                    0,
-                    top_px,
-                    left_px,
-                    body_h_px,
-                );
-                webview_hooks::show_webview_smooth(&self.vertical_webview);
-            } else {
-                webview_hooks::hide_webview_smooth(&self.vertical_webview);
+                if self.vertical_webview.is_none()
+                    && let Ok(vw) = build_internal_ui_webview(
+                        &self.window,
+                        #[cfg(target_os = "windows")]
+                        &self.shared_env,
+                        self.proxy.clone(),
+                        "ferrum://localhost/vertical",
+                        VERTICAL_HTML,
+                        Rect {
+                            position: wry::dpi::PhysicalPosition::new(0, top_px).into(),
+                            size: wry::dpi::PhysicalSize::new(
+                                left_px.max(1) as u32,
+                                body_h_px.max(1) as u32,
+                            )
+                            .into(),
+                        },
+                        (5, 5, 7, 255),
+                    )
+                {
+                    self.vertical_webview = Some(vw);
+                    self.ui_dirty = true;
+                }
+                if let Some(vw) = &self.vertical_webview {
+                    webview_hooks::set_webview_bounds_physical(vw, 0, top_px, left_px, body_h_px);
+                    webview_hooks::show_webview_smooth(vw);
+                }
+            } else if let Some(vw) = self.vertical_webview.take() {
+                webview_hooks::destroy_webview_smooth(vw);
             }
 
             if panel_px > 0 {
@@ -283,9 +330,17 @@ impl BrowserApp {
                     panel_px,
                     body_h_px,
                 );
+                #[cfg(target_os = "windows")]
+                let _ = self
+                    .panel_webview
+                    .set_memory_usage_level(MemoryUsageLevel::Normal);
                 webview_hooks::show_webview_smooth(&self.panel_webview);
             } else {
                 webview_hooks::hide_webview_smooth(&self.panel_webview);
+                #[cfg(target_os = "windows")]
+                let _ = self
+                    .panel_webview
+                    .set_memory_usage_level(MemoryUsageLevel::Low);
             }
         }
 

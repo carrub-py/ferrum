@@ -2,6 +2,14 @@
 
 Todos los cambios notables de **Ferrum Browser** se documentan en este archivo.
 
+## [0.6.1] — 2026-11-27
+
+### Optimización de memoria RAM sin perder fluidez
+- **Origen compartido `ferrum://localhost/*` + `--process-per-site`:** todas las vistas de interfaz (`chrome`, `panel`, `overlay`, `newtab` y `spare_tab`) ahora comparten **1 solo proceso renderer (~37 MB)** en lugar de 7 renderers separados (~375 MB), reduciendo el Working Set en reposo en casi **50 %** (`731 MB → 371 MB`) manteniendo apertura instantánea (`0 ms`).
+- **Creación bajo demanda (lazy) de WebViews opcionales:** la barra vertical (modo Arc) y el divisor de Vista Dividida solo se crean cuando se activan y se destruyen al cerrarse.
+- **Suspensión suave (`ICoreWebView2_3::TrySuspend()` / `Resume()`):** las pestañas ocultas inactivas por ≥ 60 s (sin audio ni carga activa) liberan memoria V8/compositor automáticamente y despiertan en ~1–3 ms sin recargar la página.
+- **Flags livianos de WebView2** (desactiva servicios de fondo y funciones extra de Edge sin tocar aceleración GPU) y **medición real de RAM privada (`PrivateWorkingSetSize`)** en el Monitor de pestañas (`Shift+Esc`).
+
 ## [0.6.0] — 2026-11-24
 
 ### Distribución y calidad nativa en Windows

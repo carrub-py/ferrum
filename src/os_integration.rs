@@ -244,7 +244,7 @@ pub fn sample_browser_memory() -> MemoryStats {
             TH32CS_SNAPPROCESS,
         };
         use windows::Win32::System::ProcessStatus::{
-            GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS,
+            GetProcessMemoryInfo, PROCESS_MEMORY_COUNTERS, PROCESS_MEMORY_COUNTERS_EX2,
         };
         use windows::Win32::System::Threading::{
             GetCurrentProcessId, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, PROCESS_VM_READ,
@@ -296,12 +296,24 @@ pub fn sample_browser_memory() -> MemoryStats {
                 ) else {
                     return 0;
                 };
-                let mut pmc = PROCESS_MEMORY_COUNTERS {
-                    cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS>() as u32,
+                let mut pmc2 = PROCESS_MEMORY_COUNTERS_EX2 {
+                    cb: std::mem::size_of::<PROCESS_MEMORY_COUNTERS_EX2>() as u32,
                     ..Default::default()
                 };
-                let bytes = if GetProcessMemoryInfo(handle, &mut pmc, pmc.cb).is_ok() {
-                    pmc.WorkingSetSize as u64
+                let bytes = if GetProcessMemoryInfo(
+                    handle,
+                    &mut pmc2 as *mut PROCESS_MEMORY_COUNTERS_EX2 as *mut PROCESS_MEMORY_COUNTERS,
+                    pmc2.cb,
+                )
+                .is_ok()
+                {
+                    if pmc2.PrivateWorkingSetSize > 0 {
+                        pmc2.PrivateWorkingSetSize as u64
+                    } else if pmc2.PrivateUsage > 0 {
+                        pmc2.PrivateUsage as u64
+                    } else {
+                        pmc2.WorkingSetSize as u64
+                    }
                 } else {
                     0
                 };
